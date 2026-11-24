@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bank Run · model checks</title>
+<style>body{font:15px/1.5 system-ui,sans-serif;margin:24px;max-width:900px}li.pass{color:#05635d}li.fail{color:#9d3c35;font-weight:700}h1{font-size:1.3rem}</style>
+</head>
+<body>
+<h1>Bank Run · model checks</h1>
+<p id="summary">Running…</p>
+<ul id="out"></ul>
+<script src="model.js"></script>
+<script>
+(function () {
+  var M = BankRunModel, out = document.getElementById('out'), pass = 0, fail = 0;
+  function check(name, ok, detail) {
+    var li = document.createElement('li'); li.className = ok ? 'pass' : 'fail';
+    li.textContent = (ok ? 'PASS  ' : 'FAIL  ') + name + (ok || !detail ? '' : '  → ' + detail); out.appendChild(li); ok ? pass++ : fail++;
+  }
+  function near(a, b) { return Math.abs(a - b) < 1e-6; }
+  function eq(name, got, want) { check(name + ' = ' + want, got !== null && near(got, want), 'got ' + got); }
+  // One-shot banks (no windows, nobody needs cash): the rule underneath every round.
+  var C = M.cleanSettings, video = M.presetSettings('video'), thin = C({ cashPct: 20, salePricePct: 50 }),
+      ins = C({ cashPct: 20, salePricePct: 50, insurance: true }), lolr = C({ cashPct: 20, salePricePct: 50, backstop: true }),
+      bad = C({ cashPct: 20, salePricePct: 50, lossPct: 30 });
+
+  // --- Video 09.6 payoffs at class scale: $101 / $100 / $50 / $0
+  var r = M.resolveBank(video, 30, 0);
+  eq('Baseline, nobody withdraws: holder', r.perHold, 101); check('…bank is sound', r.status === 'sound', r.status); check('…no withdrawer payout', r.perWithdraw === null);
+  r = M.resolveBank(video, 30, 30);
+  eq('Baseline, everyone withdraws: withdrawer', r.perWithdraw, 50); check('…bank closed', r.status === 'closed'); check('…no holder payout', r.perHold === null);
+  r = M.resolveBank(video, 30, 10);
+  eq('Baseline, a third withdraw: withdrawer', r.perWithdraw, 100); eq('…holder', r.perHold, 101);
+  r = M.resolveBank(video, 30, 15);
+  eq('Baseline, exactly half withdraw (cash just covers): withdrawer', r.perWithdraw, 100); eq('…holder', r.perHold, 101);
+  r = M.resolveBank(video, 30, 16);
+  eq('Baseline, one more than half: withdrawer', r.perWithdraw, 1500 / 16); eq('…holder', r.perHold, 0); check('…bank closed', r.closed);
+  r = M.resolveBank(video, 2, 2); eq('Two depositors, both withdraw (the video grid)', r.perWithdraw, 50);
+  r = M.resolveBank(video, 2, 0); eq('Two depositors, both hold (the video grid)', r.perHold, 101);
+
+  // --- Thinner bank, worked example in SPEC.md: 30 depositors, 9 withdraw
+  r = M.resolveBank(thin, 30, 9);
+  eq('Thin bank 9/30: cash used', r.cashUsed, 600); eq('…sale proceeds', r.saleProceeds, 300); eq('…loans sold', r.loansSold, 600); eq('…sale loss', r.saleLoss, 300);
+  eq('…withdrawer', r.perWithdraw, 100); eq('…holder', r.perHold, 1800 * 1.02 / 21); check('…status short', r.status === 'short', r.status);
+  r = M.resolveBank(thin, 30, 6); eq('Thin bank 6/30 (cash just covers): holder', r.perHold, 101); eq('…loans sold', r.loansSold, 0); check('…sound', r.status === 'sound');
+  r = M.resolveBank(thin, 30, 18); eq('Thin bank 18/30 (everything sold): withdrawer', r.perWithdraw, 100); eq('…holder', r.perHold, 0); eq('…loans sold', r.loansSold, 2400);
+  r = M.resolveBank(thin, 30, 24); eq('Thin bank 24/30 (not enough even after selling everything): withdrawer', r.perWithdraw, 75); eq('…holder', r.perHold, 0); check('…closed', r.closed); eq('…unpaid today', r.unpaidToday, 600);
+  r = M.resolveBank(thin, 30, 30); eq('Thin bank, universal withdrawal: withdrawer', r.perWithdraw, 60);
+
+  // --- Deposit insurance: holding is never worse than withdrawing
+  r = M.resolveBank(ins, 30, 24); eq('Insured 24/30: withdrawer', r.perWithdraw, 100); eq('…holder', r.perHold, 100); eq('…insurance paid', r.fdicPaid, 24 * 25 + 6 * 100);
+  r = M.resolveBank(ins, 30, 0); eq('Insured, nobody withdraws: holder', r.perHold, 101); eq('…insurance paid', r.fdicPaid, 0);
+  var ok = true; for (var k = 0; k < 30; k++) { var hold = M.resolveBank(ins, 30, k).perHold, wd = M.resolveBank(ins, 30, k + 1).perWithdraw; if (hold < wd - 1e-9) ok = false; }
+  check('Insured: for any number of other withdrawers, holding pays at least as much as withdrawing', ok);
+  var half = M.cleanSettings({ cashPct: 20, salePricePct: 50, insurance: true, insuranceLimit: 50 });
+  r = M.resolveBank(half, 30, 24); eq('Insurance limit $50, 24/30: holder gets the limit', r.perHold, 50); eq('…withdrawer keeps the bank payout', r.perWithdraw, 75);
+
+  // --- Lender of last resort: a solvent bank survives any run, and never sells a loan
+  ok = true; for (k = 0; k <= 30; k++) { r = M.resolveBank(lolr, 30, k); if (r.status !== 'sound' || r.loansSold > 1e-9 || (r.perWithdraw !== null && !near(r.perWithdraw, 100)) || (r.perHold !== null && !near(r.perHold, 101))) ok = false; }
+  check('Backstop, solvent bank: sound at every number of withdrawals, no forced sales, $100 / $101', ok);
+  r = M.resolveBank(lolr, 30, 18); eq('Backstop 18/30: central bank loan', r.fedLoan, 1200); eq('…repaid with interest', r.fedRepaid, 1224);
+
+  // --- Bad loans: the bank is insolvent even if nobody runs; a backstop does not repair it
+  r = M.resolveBank(bad, 30, 0); eq('Bad loans, nobody withdraws: holder', r.perHold, (600 + 1680 * 1.02) / 30); check('…holders lose with no run', r.status === 'short');
+  var badLolr = M.cleanSettings({ cashPct: 20, salePricePct: 50, lossPct: 30, backstop: true });
+  r = M.resolveBank(badLolr, 30, 0); check('Bad loans + backstop, nobody withdraws: still short', r.status === 'short');
+  r = M.resolveBank(badLolr, 30, 15); eq('Bad loans + backstop 15/30: withdrawer', r.perWithdraw, 100); eq('…holder', r.perHold, (1680 - 900) * 1.02 / 15);
+  r = M.resolveBank(badLolr, 30, 30); eq('Bad loans + backstop, everyone withdraws: withdrawer', r.perWithdraw, (600 + 1680) / 30); check('…closed', r.closed);
+
+  // --- Accounting identities over a grid of settings and outcomes
+  var bad1 = 0, cases = 0, why = '';
+  [0, 10, 20, 50, 100].forEach(function (c) { [0, 25, 50, 100].forEach(function (f) { [0, 30, 100].forEach(function (l) { [false, true].forEach(function (b) { [false, true].forEach(function (i) {
+    var s = M.cleanSettings({ cashPct: c, salePricePct: f, lossPct: l, backstop: b, insurance: i });
+    [1, 2, 7, 30].forEach(function (n) { for (var w = 0; w <= n; w++) {
+      var x = M.resolveBank(s, n, w), fails = [];
+      cases++;
+      if (!near(x.cash + x.loansFace, x.deposits)) fails.push('assets ≠ deposits');
+      if (!near(x.cashUsed + x.fedLoan + x.saleProceeds, x.paidToday)) fails.push('sources ≠ paid today');
+      if (w > 0 && !near(x.perWithdrawBank * w, Math.min(x.paidToday, x.requested))) fails.push('withdrawer payout ≠ money paid');
+      if (!near(x.paidToday + x.unpaidToday, Math.max(x.requested, x.paidToday))) fails.push('paid + unpaid ≠ requested');
+      if (x.loansSold > x.loansGood - x.fedLoan + 1e-6) fails.push('sold more loans than the bank owns');
+      if (x.cashUsed > x.cash + 1e-6 || x.fedLoan > x.loansGood + 1e-6) fails.push('used more than available');
+      if (!near(x.loansSold + x.loansKept + x.fedLoan, x.loansGood)) fails.push('loans sold + kept + pledged ≠ good loans');
+      if (!near(x.saleLoss, x.loansSold - x.saleProceeds) || x.saleLoss < -1e-9) fails.push('sale loss wrong');
+      if (!near(x.cashLeft + x.loansKept + x.loanInterest, x.paidHolders + x.ownersResidual)) fails.push('later: sources ≠ uses');
+      if (x.closed && (x.paidHolders > 1e-9 || x.unpaidToday < 1e-9)) fails.push('closed bank paid holders or had no shortfall');
+      if (!x.closed && w > 0 && !near(x.perWithdrawBank, 100)) fails.push('open bank did not pay withdrawals in full');
+      if (x.perHoldBank !== null && x.perHoldBank > 101 + 1e-6) fails.push('holder paid more than $101');
+      if (x.perWithdraw !== null && (x.perWithdraw > 100 + 1e-6 || x.perWithdraw < -1e-9)) fails.push('withdrawer payout out of range');
+      if (i && ((x.perHold !== null && x.perHold < 100 - 1e-6) || (x.perWithdraw !== null && x.perWithdraw < 100 - 1e-6))) fails.push('insured depositor below $100');
+      if (!i && x.fdicPaid !== 0) fails.push('insurance paid while off');
+      if (!b && x.fedLoan !== 0) fails.push('central bank lent while off');
+      if (fails.length) { bad1++; if (!why) why = JSON.stringify(s) + ' n=' + n + ' w=' + w + ': ' + fails.join('; '); }
+    } });
+  }); }); }); }); });
+  check('Accounting identities hold in all ' + cases + ' grid cases', bad1 === 0, bad1 + ' failed; first: ' + why);
+
+  // --- The class bank, played in windows (SPEC.md worked example): 30 depositors, 6 need cash
+  var bank = M.presetSettings('bank'), W = M.resolveWindows, t = M.thresholds(bank, 30), cost;
+  check('Class bank: 30% cash, 50¢ sales, 20% need cash, 3 windows', bank.cashPct === 30 && bank.salePricePct === 50 && bank.needPct === 20 && bank.windows === 3);
+  check('Class bank thresholds: holders whole up to 9 withdrawals, bank open up to 19', t.maxSafe === 9 && t.maxMet === 19, JSON.stringify(t));
+  r = W(bank, 30, [6, 0, 0]); eq('Only the 6 who need cash withdraw: holder', r.perHold, 101); eq('…withdrawer', r.perWindow[0], 100); check('…sound, no later payouts', r.status === 'sound' && r.perWindow[1] === null && r.closedInWindow === 0);
+  cost = M.runCost(bank, 30, 6, r); eq('…lost to the run', cost.destroyed, 0); check('…nobody ran', cost.ran === 0);
+  r = W(bank, 30, [6, 3, 0]); eq('Nine withdraw (cash just covers): holder', r.perHold, 101);
+  r = W(bank, 30, [6, 6, 0]); eq('6 then 6 more: both windows paid in full', r.perWindow[0] + r.perWindow[1], 200); eq('…loans sold', r.loansSold, 600); eq('…holder', r.perHold, 1500 * 1.02 / 18); check('…status short', r.status === 'short');
+  cost = M.runCost(bank, 30, 6, r); eq('…lost to the run (3,024 − 2,730)', cost.destroyed, 294); check('…six ran', cost.ran === 6);
+  r = W(bank, 30, [6, 6, 12]); check('6, 6, 12: closes in window 3', r.closedInWindow === 3 && r.status === 'closed'); eq('…window 1', r.perWindow[0], 100); eq('…window 2', r.perWindow[1], 100); eq('…window 3 splits what is left', r.perWindow[2], (1950 - 1200) / 12); eq('…holder', r.perHold, 0);
+  eq('…payoutFor window 3', M.payoutFor(r, 3), 62.5); eq('…payoutFor holder', M.payoutFor(r, null), 0);
+  r = W(bank, 30, [10, 15, 2]); check('10, 15, 2: closes in window 2', r.closedInWindow === 2); eq('…window 2', r.perWindow[1], 950 / 15); eq('…asked after the doors shut', r.perWindow[2], 0); check('…two were too late', r.late === 2 && r.w === 25 && r.h === 5);
+  r = W(M.presetSettings('insured'), 30, [10, 15, 2]); eq('Insured, same run: window 2', r.perWindow[1], 100); eq('…too late', r.perWindow[2], 100); eq('…holder', r.perHold, 100);
+  eq('…insurance paid', r.fdicPaid, 15 * (100 - 950 / 15) + 5 * 100); eq('…bank part, window 2', M.bankPayoutFor(r, 2), 950 / 15);
+  ok = true; for (k = 0; k <= 30; k++) { r = W(M.presetSettings('backstop'), 30, [6, k > 6 ? k - 6 : 0, 0]); if (r.status !== 'sound' || r.closedInWindow) ok = false; }
+  check('Lender of last resort: the class bank is sound at every size of run', ok);
+  r = M.resolveBank(M.presetSettings('badloans'), 30, 6); eq('Bad loans, only the needy withdraw: holder', r.perHold, (300 + 1470 * 1.02) / 24); check('…holders already lose', r.status === 'short');
+  check('Bad loans: holders lose even with no withdrawals', M.thresholds(M.presetSettings('badloans'), 30).maxSafe === -1);
+
+  // Windows never change the total the bank pays; they only decide who gets it.
+  var badW = 0, casesW = 0, whyW = '';
+  [bank, M.presetSettings('insured'), M.presetSettings('backstop'), M.presetSettings('badloans'), video].forEach(function (s) {
+    [1, 2, 7, 30].forEach(function (n) { for (var a = 0; a <= n; a++) for (var b = 0; a + b <= n; b += (n > 7 ? 3 : 1)) for (var c = 0; a + b + c <= n; c += (n > 7 ? 4 : 1)) {
+      var x = W(s, n, [a, b, c]), flat = M.resolveBank(s, n, a + b + c), fails = [], paid = 0, counts = [a, b, c];
+      casesW++;
+      for (var j = 0; j < 3; j++) if (counts[j] > 0) paid += counts[j] * x.perWindowBank[j];
+      if (!near(paid, Math.min(x.paidToday, x.requested + x.late * 100))) fails.push('window payouts ≠ money the bank paid');
+      if (!x.closedInWindow && (!near(x.paidHolders, flat.paidHolders) || x.status !== flat.status)) fails.push('open bank differs from the one-shot rule');
+      if (x.closedInWindow && x.paidHolders > 1e-9) fails.push('closed bank paid holders');
+      for (j = 0; j < 3; j++) if (x.perWindow[j] !== null && (x.perWindow[j] > 100 + 1e-6 || x.perWindow[j] < -1e-9)) fails.push('window payout out of range');
+      for (j = 1; j < 3; j++) if (x.perWindow[j] !== null && x.perWindow[j - 1] !== null && x.perWindowBank[j] > x.perWindowBank[j - 1] + 1e-6) fails.push('a later window was paid more than an earlier one');
+      if (s.insurance) for (j = 0; j < 3; j++) if (x.perWindow[j] !== null && x.perWindow[j] < 100 - 1e-6) fails.push('insured withdrawer below $100');
+      if (fails.length) { badW++; if (!whyW) whyW = JSON.stringify(s) + ' n=' + n + ' [' + counts + ']: ' + fails.join('; '); }
+    } });
+  });
+  check('Window payouts add up in all ' + casesW + ' cases', badW === 0, badW + ' failed; first: ' + whyW);
+
+  // --- Settings hygiene
+  var cs = M.cleanSettings({ cashPct: 250, salePricePct: -5, lossPct: 'x' });
+  check('Out-of-range settings are clamped', cs.cashPct === 100 && cs.salePricePct === 0 && cs.lossPct === 0);
+  r = M.resolveBank(thin, 0, 0); check('Zero depositors does not divide by zero', r.perHold === null && r.perWithdraw === null && r.status === 'sound');
+  check('maxWithdrawalsMet: baseline 30 → 15, thin 30 → 18', M.maxWithdrawalsMet(video, 30) === 15 && M.maxWithdrawalsMet(thin, 30) === 18);
+
+  var sum = document.getElementById('summary'); sum.textContent = pass + ' passed, ' + fail + ' failed'; sum.style.color = fail ? '#9d3c35' : '#05635d';
+  document.title = (fail ? 'FAIL ' : 'PASS ') + pass + '/' + (pass + fail);
+  window.BANK_RUN_TESTS = { pass: pass, fail: fail };
+})();
+</script>
+</body>
+</html>
