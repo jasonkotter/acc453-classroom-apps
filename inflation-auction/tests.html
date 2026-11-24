@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Inflation Auction · model checks</title>
+<style>body{font:15px/1.5 system-ui,sans-serif;max-width:900px;margin:30px auto;padding:0 16px}.ok{color:#05635d}.bad{color:#9d3c35;font-weight:700}</style></head>
+<body><h1>Inflation Auction · model checks</h1><p id="sum"></p><ol id="out"></ol>
+<script src="model.js"></script>
+<script>
+const A = window.AuctionModel, out = document.getElementById('out'); let pass = 0, fail = 0;
+const ok = (cond, name) => { const li = document.createElement('li'); li.className = cond ? 'ok' : 'bad'; li.textContent = (cond ? '✔ ' : '✖ ') + name; out.appendChild(li); cond ? pass++ : fail++; };
+const ids = n => Array.from({ length: n }, (_, i) => 'p' + i);
+const vals = o => Object.values(o).sort((a, b) => b - a);
+
+// Budgets: the SPEC worked example (10 students, base $2)
+let b = A.budgets(ids(10), 'TEST', 2, 1);
+ok(JSON.stringify(vals(b)) === JSON.stringify([20, 10, 7, 5, 4, 3, 3, 3, 2, 2]), 'ten students, base $2: budgets 20, 10, 7, 5, 4, 3, 3, 3, 2, 2');
+ok(Object.values(b).reduce((t, x) => t + x, 0) === 59, 'money in the room is $59');
+const b2 = A.budgets(ids(10), 'TEST', 2, 2);
+ok(ids(10).every(id => b2[id] === 2 * b[id]), 'double the money doubles every student\'s budget exactly');
+ok(ids(10).every(id => A.budgets(ids(10), 'TEST', 2, 1)[id] === b[id]), 'budgets are reproducible from the session code and ids');
+ok(JSON.stringify(A.budgets(ids(10), 'OTHER', 2, 1)) !== JSON.stringify(b), 'another session ranks students differently');
+ok(Math.min(...Object.values(A.budgets(ids(80), 'X', 2, 1))) === 2 && Math.max(...Object.values(A.budgets(ids(80), 'X', 2, 1))) === 160, '80 students, base $2: budgets run from $2 to $160');
+
+// Clearing
+const bid = (id, v, prio = 0) => ({ id, bid: v, prio });
+let c = A.clear([bid('a', 20), bid('b', 10), bid('c', 7), bid('d', null)], 1);
+ok(c.price === 10 && c.winners.has('a') && c.sold === 1, 'one can: the top bid wins and pays the highest losing bid');
+c = A.clear([bid('a', 40), bid('b', 20), bid('c', 14), bid('d', 10)], 2);
+ok(c.price === 14 && c.sold === 2 && c.winners.has('a') && c.winners.has('b'), 'two cans: both winners pay the third bid');
+c = A.clear([bid('a', 5), bid('b', 3)], 4);
+ok(c.price === 1 && c.sold === 2, 'more cans than bids: every bidder wins at $1, cans go unsold');
+c = A.clear([bid('a', null), bid('b', null)], 1);
+ok(c.price === null && c.sold === 0, 'no bids: no sale');
+c = A.clear([bid('a', 5, 2), bid('b', 5, 1), bid('c', 5, 3)], 1);
+ok(c.winners.has('b') && c.price === 5, 'a tie at the cutoff goes to the lower priority number; the price is the tied bid');
+c = A.clear([bid('a', 5, 2), bid('b', 5, 1), bid('c', 5, 3)], 2);
+ok(c.winners.has('a') && c.winners.has('b') && !c.winners.has('c'), 'two cans, three tied: the two lowest priority numbers win');
+c = A.clear([bid('a', 0), bid('b', 2.5), bid('c', 3)], 1);
+ok(c.nBids === 1 && c.price === 1 && c.winners.has('c'), 'zero and fractional bids are not bids (the server also rejects them)');
+ok(A.cansFor(80, 10) === 8 && A.cansFor(80, 20) === 16 && A.cansFor(3, 10) === 1, 'cans: 10% of 80 is 8, 20% is 16, never fewer than 1');
+
+// The quantity-theory pattern when everyone bids their whole budget
+const price = (n, pct, mult) => { const bb = A.budgets(ids(n), 'Q', 2, mult); return A.clear(ids(n).map((id, i) => bid(id, bb[id], i)), A.cansFor(n, pct)).price; };
+const p1 = price(80, 10, 1), p2 = price(80, 10, 2), p3 = price(80, 20, 2), p4 = price(80, 20, 1);
+ok(p2 === 2 * p1, `bidding all cash, 80 students: double the money doubles the price (${p1} → ${p2})`);
+ok(Math.abs(p3 / p1 - 1) < 0.15, `double both money and cans: price back near baseline (${p1} → ${p3})`);
+ok(Math.abs(p4 / p1 - 0.5) < 0.1, `double the cans only: price about halves (${p1} → ${p4})`);
+const sp = (n, pct, mult) => price(n, pct, mult) * A.cansFor(n, pct);
+ok(Math.abs(sp(80, 20, 1) / sp(80, 10, 1) - 1) < 0.15, 'spending (P × Y) stays about the same when the cans double');
+
+document.getElementById('sum').innerHTML = `<b class="${fail ? 'bad' : 'ok'}">${pass} passed, ${fail} failed</b>`;
+</script></body></html>

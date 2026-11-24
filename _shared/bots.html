@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Simulated students · ACC 453</title>
+  <link rel="stylesheet" href="classroom.css">
+</head>
+<body>
+  <header class="top"><div class="brand">Money &amp; Banking · Classroom</div><div class="course">Rehearsal tool</div></header>
+  <main class="shell">
+    <section class="hero"><div><div class="eyebrow">Classroom-scale rehearsal</div><h1>Simulated students</h1>
+      <p>Joins simulated students to a <b>live</b> session, and they play each round with the game's own simulated choices. Use it to rehearse with a full room before class. Their names start with “Bot”.</p></div></section>
+    <div class="card" style="max-width:760px">
+      <div class="row">
+        <div class="field"><label for="app">Game</label><select id="app">
+          <option value="inflation-auction">Inflation Auction</option>
+          <option value="barter-market">Barter Market</option>
+        </select></div>
+        <div class="field" style="max-width:130px"><label for="code">Session code</label><input id="code" maxlength="4" autocapitalize="characters" placeholder="ABCD"></div>
+        <div class="field" style="max-width:110px"><label for="n">Students</label><input id="n" type="number" min="1" max="150" value="40"></div>
+        <button class="btn primary" id="go">Join and play</button>
+        <button class="btn secondary" id="stop" disabled>Stop</button>
+      </div>
+      <p class="msg" id="msg"></p>
+      <h3>Log</h3>
+      <pre id="log" style="white-space:pre-wrap;font-size:.8rem;max-height:420px;overflow:auto;background:#f3f6f4;border-radius:10px;padding:10px"></pre>
+    </div>
+  </main>
+<script src="config.js"></script>
+<script>window.CLASSROOM_NO_START = true;</script>
+<script src="local.js"></script>
+<script src="classroom.js"></script>
+<script>
+(async () => {
+  const $ = id => document.getElementById(id), params = new URLSearchParams(location.search);
+  const log = (...a) => { $('log').textContent = new Date().toLocaleTimeString() + ' ' + a.join(' ') + '\n' + $('log').textContent; };
+  if (params.get('app')) $('app').value = params.get('app');
+  if (params.get('code')) $('code').value = params.get('code').toUpperCase();
+  const loadScript = src => new Promise(res => { const s = document.createElement('script'); s.src = src; s.onload = () => res(true); s.onerror = () => res(false); document.head.appendChild(s); });
+  const conn = await window.Classroom.connect('bots', false);
+  if (!conn.live) { $('msg').textContent = 'No Supabase configuration in config.js, so there is no live session to join.'; $('msg').className = 'msg bad'; $('go').disabled = true; return; }
+  const api = conn.api;
+  let running = false, timer = null;
+  $('go').onclick = async () => {
+    const app = $('app').value, code = $('code').value.trim().toUpperCase(), n = Math.max(1, Math.min(150, Number($('n').value) || 1));
+    if (!code) { $('msg').textContent = 'Enter the session code.'; return; }
+    if (!window.CLASSROOM_GAME) {
+      const deps = { 'inflation-auction': ['model.js', 'game.js'], 'barter-market': ['game.js'] }[app] || ['game.js'];
+      for (const f of deps) if (!await loadScript(`../${app}/${f}`)) { $('msg').textContent = `Could not load ../${app}/${f}.`; return; }
+    }
+    const game = window.CLASSROOM_GAME;
+    let S; try { S = await api.state(code); } catch (e) { $('msg').textContent = e.message; return; }
+    if (S.game !== game.id) { $('msg').textContent = `Session ${code} is running ${S.game}, not ${game.id}.`; return; }
+    const bots = [];
+    for (let i = 0; i < n; i++) { try { const p = await api.join(code, `Bot ${i + 1}`); bots.push({ id: p.id, secret: p.secret, tag: p.tag, name: `Bot ${i + 1}` }); } catch (e) { log('join failed:', e.message); } }
+    log(`joined ${bots.length} simulated students to ${code}`);
+    running = true; $('go').disabled = true; $('stop').disabled = false; $('msg').textContent = `${bots.length} playing in ${code}.`;
+    let last = '';
+    const loop = async () => {
+      if (!running) return;
+      try {
+        const st = await api.state(code);
+        const key = `${st.phase} · round ${st.roundNo} · step ${st.step}${st.pending ? ' (pending)' : ''}`;
+        if (key !== last) { last = key; log(key, `· ${st.nMoved}/${st.nPlayers} answered`); }
+        if (st.phase === 'open' && !st.pending && game.sim) for (const line of await window.Classroom.simTick(api, code, bots, game, Math.random)) log(line);
+      } catch (e) { log('error:', e.message); }
+      if (running) timer = setTimeout(loop, 1500);
+    };
+    loop();
+  };
+  $('stop').onclick = () => { running = false; clearTimeout(timer); $('go').disabled = false; $('stop').disabled = true; $('msg').textContent = 'Stopped. The simulated students stay in the session but do nothing more.'; };
+})();
+</script>
+</body>
+</html>

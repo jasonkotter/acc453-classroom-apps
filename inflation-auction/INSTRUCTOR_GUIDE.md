@@ -1,49 +1,62 @@
 # Instructor guide: Inflation Auction
 
-## Setup
+**Goal.** Students see the price respond to money and to goods, and on Jan 14 turn the round
+table into M × V = P × Y. Played cold on Jan 12 (no video first).
 
-For the local demonstration, open `index.html` in a current browser and select **Instructor**. Add the simulated students before opening the round. Students can use the **Student phone** view in the same browser. Select **Projector** for the shared results view. Local mode shares one browser's storage only; it is not yet a multi-phone classroom service.
+## Setup (5 minutes before class)
 
-Before class, set the baseline cash and supply controls, check the projector view, and export a sample CSV if a record is needed. Clear the local demo between rehearsals with **Reset demo**.
+1. Open `inflation-auction/?view=instructor` on the laptop and create a session with the
+   instructor passphrase.
+2. Open the projector screen from the link on the instructor page and put it on the projector.
+   It shows the join code and a QR code.
+3. Optional: bring real cans for the winners. With 70 students and 10% cans, that is 7 cans in
+   rounds 1–2 and 14 in round 3.
 
-## Suggested 15-minute run
+To rehearse without phones, add `?demo=1` to the address: the instructor screen can add
+simulated students and the Student phone tab plays one student.
 
-| Time | Activity |
+## Run (about 15 minutes)
+
+| Time | Step |
 |---|---|
-| 1 min | Read the opening script and state the auction rules. |
-| 2 min | Join, assign budgets, and run the baseline. |
-| 2 min | Reveal bids and ask students what determined the price. |
-| 2 min | Reset budgets at twice their baseline and run the same one-can auction. |
-| 2 min | Compare the first two results; ask whether price doubled. |
-| 2 min | Keep the larger cash budgets, raise supply to four cans, and run again. |
-| 4 min | Compare all three rounds and connect the result to money, nominal spending, goods, and MV = PY. |
+| 2 min | Students join. Read the opening script while they do. |
+| 3 min | **Baseline.** Show round → Open bidding → Close bidding → Reveal. Ask what set the price. |
+| 3 min | **Double the money.** Show next round (the menu has already moved to it). Students predict, then bid. Reveal. Did the price double? |
+| 3 min | **Double the cans too.** Same steps. Did the price come back? |
+| 4 min | Point at the round table: money, cans, price, spending. Save the formal debrief for Jan 14. |
 
 ## Opening script
 
-“This economy has one thing to buy: cans of Diet Coke. You each receive cash for this round. Submit one private bid, at least one dollar and no higher than your cash. The highest bids win, up to the number of cans available, and winners pay their own bids. Ties at the cutoff use a shuffled priority order. No bid means you keep your cash. You can change your bid until I close the round. Your cash resets next round.”
+"Money just fell from the sky. Each of you has a private cash budget on your phone. A few of
+you got a lot, most of you got a little, and no one can earn more. There is one thing to buy: a
+can of Diet Coke, and there are only enough cans for about one in ten of you. Your cash is good
+for nothing else, so whatever you don't spend is worthless when the round ends. Bid any whole
+number of dollars up to your cash. The highest bids win, and every winner pays the same price:
+the highest bid that didn't win. Bids are sealed, and you can change yours until I close bidding."
 
-## Round settings
+## What to expect
 
-1. **Baseline:** one can, baseline cash.
-2. **More money:** one can, twice each participant's starting budget.
-3. **More goods:** four cans, same budgets as round 2.
+- The price is set by the students with the largest budgets, so it depends on a handful of
+  people. Doubling the money should roughly double it and doubling both money and cans should
+  bring it back near the baseline, but expect some noise: in simulations with 80 students who bid
+  all their cash, "double the money" gives between 1.8 and 2.3 times the baseline price four times
+  in five. Students who bid far below their cash add noise.
+- Most students cannot win (their budgets are small). That is the point of the 1/rank budgets;
+  if asked, explain that money "fell" unevenly, as it does.
+- Spent ÷ money (V) should stay roughly constant. If it jumps, look for a top-budget student who
+  bid low or did not bid.
 
-The local demo assigns simulated participants bids as a share of their budget, with occasional no-bids. Those choices are illustrative and are not an economic prediction. Real students should choose their own bids in a connected classroom version.
+## Debrief questions (Jan 14)
 
-## Expected patterns and debrief
-
-More cash can increase bids and the winning price, but the price need not double. The app calculates prices from submitted bids; no treatment rule multiplies the price. More cans can increase quantity sold and may change the cutoff bid. With varied bids, unused cash remains after a round. These outcomes depend on student choices and are not guaranteed.
-
-Ask:
-
-- Did the winning price rise when cash increased? By how much?
-- Did everyone spend all of their additional cash? Why or why not?
-- What happened to price and quantity when the number of cans increased?
-- Which parts of this economy are unlike the actual economy?
-- How does this auction help motivate MV = PY? What does it leave out?
-
-Emphasize that this one-good model fixes real output and gives money only one use. It illustrates a mechanism; it does not establish a mechanical one-for-one relationship between money growth and inflation in the real economy.
+- Did doubling the money double the price? Why?
+- What happened when the cans doubled along with the money?
+- Spending divided by money is V. Was it stable across rounds? What would make it change?
+- Write M × V = P × Y with the numbers from the table.
+- What does this economy leave out (production, saving, credit, other goods, other uses of money)?
 
 ## Fallback without the app
 
-Use four volunteers and one can. Give each a private paper budget, collect sealed bids, then sort them publicly. Award the can to the highest bid; flip a coin or draw a numbered slip for a tie at the cutoff. Collect bids for the second round after doubling budgets, then repeat with more cans. Write the bids, winning prices, quantity sold, and cash left on the board for comparison. Keep the number of participants, tie process, and budget changes explicit.
+Four volunteers and one can, as in past years: give each a private paper budget (e.g., $8, $4,
+$3, $2), collect sealed bids on slips, and sell to the highest bid at the second-highest bid. Double
+every budget and repeat. Then double the budgets and sell two cans at the third-highest bid.
+Write M, Y, and P on the board for each round.

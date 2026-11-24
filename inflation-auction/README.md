@@ -1,7 +1,10 @@
 # Inflation Auction
 
-Open `index.html` in a modern browser for a self-contained local demonstration. No package install, account, or network connection is needed. Use **Add simulated students**, open the round, switch to **Student phone** to join and bid, close submissions, then reveal. The first demo round can be followed by the preset 2× cash and increased-supply treatments. Results can be exported to CSV.
+Runs on the shared classroom toolkit (`../_shared/`). Rules: [SPEC.md](SPEC.md). Running it in
+class: [INSTRUCTOR_GUIDE.md](INSTRUCTOR_GUIDE.md). Model checks: open `tests.html`.
 
-For screen-specific URLs, append `?view=projector` or `?view=instructor`. All demo screens in a browser share its local session state. Open `SPEC.md` for the rules and treatment sequence.
-
-This is the app's local prototype. It does not yet synchronize multiple devices or enforce instructor authority. The classroom build still needs Supabase configuration, backend validation and resolution, protected unrevealed bids, refresh recovery, and 3–5 person phone playtesting, as described in `classroom/APP_BUILD_PLAN.md`.
+- **Live:** students open `index.html` (the projector shows the address, code, and QR). The
+  instructor opens `index.html?view=instructor`. Needs `_shared/schema.sql` installed in Supabase
+  and `_shared/config.js` filled in.
+- **Local demo:** add `?demo=1`. Everything stays in one browser; the instructor screen can add
+  simulated students, and each browser tab on the Student phone screen is one more student.
