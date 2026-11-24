@@ -93,8 +93,9 @@ details summary{cursor:pointer;font-weight:750;font-size:.88rem;color:var(--teal
 .taccount p{margin:4px 0;display:flex;justify-content:space-between;gap:12px}
 .taccount p span:last-child{font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
 /* projector mode: one screen, large type, no navigation */
-body.proj .hero,body.proj .tabs,body.proj .footer{display:none}
-body.proj .shell{max-width:1500px;padding:16px 22px 30px;font-size:1.18rem}
+body.proj .top,body.proj .hero,body.proj .tabs,body.proj .footer{display:none}
+body.proj .taccount>div{padding:8px 12px}body.proj .taccount p{margin:2px 0}
+body.proj .shell{max-width:1500px;padding:10px 22px 16px;font-size:1.18rem}
 body.proj .card h2{font-size:1.9rem}
 body.proj table{font-size:1.02rem}
 body.proj .tile strong{font-size:2.1rem}

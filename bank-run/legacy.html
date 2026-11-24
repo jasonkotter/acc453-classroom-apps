@@ -1,0 +1,753 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#102a35">
+  <meta name="description" content="A classroom bank-run game: hold or withdraw, and see what the class did to the bank.">
+  <title>Bank Run · ACC 453</title>
+  <style>
+    :root{color-scheme:light;--ink:#152f39;--muted:#5d6e73;--paper:#f4f3ee;--card:#fff;--line:#dce3df;--teal:#087d75;--teal-dark:#05635d;--mint:#e5f3ef;--gold:#d6a13b;--navy:#102a35;--red:#9d3c35;--rose:#f9e9e7;--amber:#fbf1d9;--hold:#2a78d6;--wd:#eb6834;--shadow:0 12px 32px #19363b0c;--radius:18px;font:16px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--paper);color:var(--ink)}
+    button,input,select{font:inherit}
+    button{cursor:pointer}
+    button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+    .top{background:var(--navy);color:#fff;padding:14px max(18px,calc((100vw - 1200px)/2));display:flex;justify-content:space-between;align-items:center;gap:12px}
+    .brand{font-weight:800;letter-spacing:.1em;text-transform:uppercase;font-size:.78rem}
+    .course{color:#bbcecf;font-size:.8rem;text-align:right}
+    .shell{max-width:1200px;margin:auto;padding:24px 20px 60px}
+    .hero{display:flex;justify-content:space-between;align-items:end;gap:20px;margin:4px 0 20px}
+    .eyebrow,.label{font-size:.7rem;text-transform:uppercase;letter-spacing:.13em;font-weight:800;color:var(--teal-dark)}
+    h1{font-size:clamp(2rem,5vw,3.3rem);line-height:1.02;letter-spacing:-.05em;margin:8px 0}
+    .hero p{color:var(--muted);margin:8px 0 0;max-width:650px}
+    .pill{border-radius:999px;background:#fff;border:1px solid var(--line);padding:8px 13px;font-size:.8rem;font-weight:750;white-space:nowrap}
+    .dot{height:9px;width:9px;background:var(--gold);border-radius:50%;display:inline-block;margin-right:7px}
+    .tabs{display:flex;gap:8px;overflow:auto;padding:2px 0 14px}
+    .tab{border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:999px;padding:9px 14px;font-size:.86rem;font-weight:750;white-space:nowrap}
+    .tab[aria-selected=true]{background:var(--navy);border-color:var(--navy);color:#fff}
+    .view{display:none}.view.active{display:block}
+    .grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(280px,.75fr);gap:16px;align-items:start}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:clamp(18px,3vw,26px);box-shadow:var(--shadow)}
+    .card h2{font-size:1.25rem;line-height:1.2;margin:0 0 6px;letter-spacing:-.02em}
+    .card h3{font-size:1rem;margin:18px 0 8px}
+    .sub{color:var(--muted);font-size:.92rem;margin:0 0 16px}
+    .note{font-size:.8rem;color:var(--muted)}
+    .banner{padding:14px 16px;border-radius:12px;background:var(--mint);margin:14px 0}
+    .banner strong{display:block}
+    .banner.warn{background:var(--amber)}.banner.bad{background:var(--rose)}
+    .field{display:grid;gap:5px;flex:1;min-width:0}
+    .field label{font-size:.83rem;font-weight:750}
+    .field input,.field select{width:100%;border:1px solid var(--line);border-radius:10px;padding:11px 12px;background:#fff;color:var(--ink);min-height:46px}
+    .row{display:flex;gap:10px;align-items:end;flex-wrap:wrap}
+    .settings{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}
+    .check{display:flex;gap:9px;align-items:center;font-size:.9rem;font-weight:700;min-height:46px}
+    .check input{width:20px;height:20px}
+    .btn{border:0;border-radius:11px;padding:11px 16px;min-height:44px;font-weight:780}
+    .primary{background:var(--teal);color:#fff}.primary:hover{background:var(--teal-dark)}
+    .secondary{background:#edf1ef;color:var(--ink)}
+    .danger{background:var(--rose);color:var(--red)}
+    .btn:disabled{opacity:.42;cursor:not-allowed}
+    .btn.next{box-shadow:0 0 0 3px var(--gold)}
+    .actions{display:flex;flex-wrap:wrap;gap:9px;margin-top:16px}
+    .msg{font-weight:750;min-height:24px;margin:10px 0 0}
+    .msg.bad{color:var(--red)}.msg.good{color:var(--teal-dark)}
+    .hidden{display:none!important}
+    .footer{margin-top:20px;color:var(--muted);font-size:.75rem;text-align:center}
+    .mono,td,.tile strong{font-variant-numeric:tabular-nums}
+    ul.rules{padding-left:1.15em;margin:8px 0}
+    ul.rules li{margin:5px 0}
+    /* choice buttons */
+    .choices{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0 6px}
+    .choice{border:2px solid var(--line);background:#fff;border-radius:16px;padding:18px 14px;text-align:left;min-height:120px;color:var(--ink)}
+    .choice b{display:block;font-size:1.35rem;letter-spacing:-.02em}
+    .choice span{display:block;font-size:.88rem;color:var(--muted);margin-top:4px}
+    .choice .tag{display:none;margin-top:10px;font-size:.78rem;font-weight:800;color:var(--teal-dark)}
+    .choice[aria-pressed=true]{border-color:var(--teal);background:var(--mint);box-shadow:inset 0 0 0 2px var(--teal)}
+    .choice[aria-pressed=true] .tag{display:block}
+    .bigpay{font-size:clamp(2.4rem,9vw,3.4rem);font-weight:900;letter-spacing:-.05em;line-height:1.05}
+    /* tables */
+    .scroll{overflow-x:auto}
+    table{width:100%;border-collapse:collapse;font-size:.9rem}
+    th,td{text-align:right;padding:9px 8px;border-bottom:1px solid var(--line)}
+    th{font-size:.74rem;color:var(--muted);font-weight:750}
+    th:first-child,td:first-child{text-align:left}
+    .taccount{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin:10px 0}
+    .taccount>div{padding:12px 14px}
+    .taccount>div+div{border-left:2px solid var(--ink)}
+    .taccount h4{margin:0 0 8px;font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);border-bottom:2px solid var(--ink);padding-bottom:6px}
+    .taccount p{margin:4px 0;display:flex;justify-content:space-between;gap:12px}
+    .taccount p span:last-child{font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+    .taccount p.minor{color:var(--muted);font-size:.86em}
+    .badges{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+    .badge{border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:.84rem;font-weight:750;background:#fff}
+    .badge.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+    .joincode{font-size:clamp(2.4rem,9vw,5rem);line-height:1;font-weight:900;letter-spacing:.13em;color:var(--teal-dark)}
+    .tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0}
+    .tile{background:#f3f6f4;border-radius:13px;padding:13px 14px}
+    .tile small{display:block;color:var(--muted);font-size:.76rem;line-height:1.25}
+    .tile strong{display:block;font-size:1.6rem;letter-spacing:-.04em}
+    .tiles.three{grid-template-columns:repeat(3,1fr)}
+    .tile.out{background:#fff;border:1px dashed #9fb0ae}
+    .headline{display:flex;gap:14px;align-items:center;padding:16px 18px;border-radius:14px;margin:12px 0;background:var(--mint)}
+    .headline.short{background:var(--amber)}.headline.closed{background:var(--rose)}
+    .headline .icon{font-size:2rem;line-height:1;font-weight:900}
+    .headline b{display:block;font-size:1.35rem;letter-spacing:-.02em;line-height:1.2}
+    .sharebig{font-size:clamp(2.6rem,7vw,4.6rem);font-weight:900;letter-spacing:-.05em;line-height:1}
+    .split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:18px;align-items:start}
+    .stack{display:flex;height:34px;border-radius:8px;overflow:hidden;gap:2px;background:#fff;margin:8px 0 6px}
+    .stack i{display:block;min-width:2px}
+    .legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:.82rem;color:var(--muted)}
+    .legend span{display:inline-flex;align-items:center;gap:6px}
+    .sw{width:14px;height:14px;border-radius:3px;display:inline-block}
+    .chartwrap{position:relative}
+    .chartwrap svg{width:100%;height:auto;display:block;font-family:inherit}
+    .tip{position:absolute;pointer-events:none;background:var(--navy);color:#fff;border-radius:9px;padding:8px 10px;font-size:.8rem;line-height:1.35;white-space:nowrap;transform:translate(-50%,-110%);display:none;z-index:2}
+    details summary{cursor:pointer;font-weight:750;font-size:.88rem;color:var(--teal-dark);margin-top:8px}
+    /* withdrawal meter: share of depositors who have withdrawn, with the bank's limits marked */
+    .meter{position:relative;height:38px;border-radius:9px;background:#e4eae7;margin:30px 0 32px}
+    .meter .fill{position:absolute;inset:0 auto 0 0;background:var(--wd);border-radius:9px 0 0 9px;max-width:100%}
+    .meter .mk{position:absolute;top:-7px;bottom:-7px;width:0;border-left:2px dashed var(--ink)}
+    .meter .mk span{position:absolute;left:6px;white-space:nowrap;font-size:.8rem;font-weight:750;font-style:normal}
+    .meter .mk.left span{left:auto;right:6px}
+    .meter .mk.up span{top:-17px}.meter .mk.down span{bottom:-18px}
+    /* guesses */
+    .chips{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin:10px 0}
+    .chip{border:2px solid var(--line);background:#fff;border-radius:10px;min-height:44px;font-weight:780;color:var(--ink);padding:4px}
+    .chip[aria-pressed=true]{border-color:var(--teal);background:var(--mint)}
+    .hist{display:grid;grid-template-columns:repeat(11,1fr);gap:4px;margin:10px 0 4px}
+    .hcol{text-align:center}
+    .hbar{height:64px;display:flex;flex-direction:column;justify-content:flex-end;gap:1px}
+    .hbar i{display:block;border-radius:2px}
+    .hcol small{display:block;font-size:.68rem;color:var(--muted);line-height:1.2;margin-top:3px}
+    .hcol.act small{font-weight:800;color:var(--ink)}
+    .lead{font-size:clamp(2.2rem,5.4vw,3.8rem);font-weight:900;letter-spacing:-.05em;line-height:1.02;margin:4px 0 8px}
+    .choice.wide{width:100%;min-height:0}
+    /* projector mode: one screen, large type, no navigation */
+    body.proj .hero,body.proj .tabs,body.proj .footer{display:none}
+    body.proj .shell{max-width:1500px;padding:16px 22px 30px;font-size:1.18rem}
+    body.proj .card h2{font-size:1.9rem}
+    body.proj table{font-size:1.02rem}
+    body.proj .tile strong{font-size:2rem}
+    body.proj .tile small,body.proj .legend,body.proj .note{font-size:.95rem}
+    body.proj ul.rules{font-size:1.25rem}
+    @media(max-width:860px){.grid,.split{grid-template-columns:minmax(0,1fr)}.tiles,.tiles.three{grid-template-columns:repeat(2,1fr)}.settings{grid-template-columns:1fr 1fr}.hero{display:block}.pill{display:inline-block;margin-top:12px}}
+    @media(max-width:420px){.shell{padding:18px 14px 40px}.choices{grid-template-columns:1fr}.choice{min-height:0}.settings{grid-template-columns:1fr}.top{padding:12px 14px}}
+    @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+  </style>
+</head>
+<body>
+  <header class="top"><div class="brand">Money &amp; Banking · Classroom</div><div class="course">ACC 453 · Bank Run</div></header>
+  <main class="shell">
+    <section class="hero">
+      <div><div class="eyebrow">A shared classroom experiment</div><h1>Bank Run</h1>
+        <p>Everyone has $100 in the same bank. Hold or withdraw. What you receive depends on what everyone else does.</p></div>
+      <div class="pill"><i class="dot"></i><span id="phaseText">Lobby</span></div>
+    </section>
+    <nav class="tabs hidden" id="tabs" aria-label="Choose screen"></nav>
+
+    <!-- STUDENT -->
+    <section class="view" id="student">
+      <div class="grid">
+        <article class="card">
+          <div class="label" id="sLabel">Bank Run</div>
+          <div id="joinForm" class="hidden">
+            <h2>Join the bank</h2>
+            <p class="sub">Enter a display name. Use a first name or a nickname; nothing else is collected.</p>
+            <div class="row">
+              <div class="field hidden" id="codeField" style="max-width:130px"><label for="codeInput">Session code</label><input id="codeInput" maxlength="4" autocapitalize="characters" autocomplete="off" placeholder="ABCD"></div>
+              <div class="field"><label for="nameInput">Display name</label><input id="nameInput" maxlength="24" autocomplete="nickname" placeholder="e.g., Alex"></div>
+              <button class="btn primary" id="joinBtn">Join</button>
+            </div>
+            <p class="msg bad" id="joinMsg" aria-live="polite"></p>
+          </div>
+          <div id="studentBody" aria-live="polite"></div>
+        </article>
+        <aside class="card">
+          <h2>How it works</h2>
+          <div id="studentRules"><p class="sub">The rules for each round appear here once the instructor sets it up.</p></div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- INSTRUCTOR -->
+    <section class="view" id="instructor">
+      <div id="hostGate" class="card hidden" style="max-width:560px">
+        <div class="label">Instructor</div><h2>Start a session</h2>
+        <p class="sub">Enter the instructor passphrase you set in Supabase. It is sent once to create the session and is not saved in this browser.</p>
+        <div class="row"><div class="field"><label for="hostKey">Instructor passphrase</label><input id="hostKey" type="password" autocomplete="off"></div><button class="btn primary" id="createBtn">Create session</button></div>
+        <p class="msg bad" id="hostMsg" aria-live="polite"></p>
+      </div>
+      <div class="grid" id="hostPanel">
+        <article class="card">
+          <div class="label">Private instructor controls</div><h2>Run the round</h2>
+          <p class="sub">Choose a treatment, show it to the class, open withdrawals, end each window, then reveal. Settings are copied into the round when you show it.</p>
+          <div class="row">
+            <div class="field"><label for="preset">Treatment</label><select id="preset"></select></div>
+            <div class="field"><label for="roundLabel">Label on the projector</label><input id="roundLabel" maxlength="60"></div>
+          </div>
+          <p class="note" id="presetNote"></p>
+          <div class="settings">
+            <div class="field"><label for="cashPct">Cash reserves (% of deposits)</label><input id="cashPct" type="number" min="0" max="100" step="1"></div>
+            <div class="field"><label for="salePricePct">Forced-sale price (cents per $1)</label><input id="salePricePct" type="number" min="0" max="100" step="1"></div>
+            <div class="field"><label for="lossPct">Bad loans (% of loans)</label><input id="lossPct" type="number" min="0" max="100" step="1"></div>
+            <label class="check"><input type="checkbox" id="insurance"> Deposit insurance</label>
+            <div class="field"><label for="insuranceLimit">Insurance limit ($ per depositor)</label><input id="insuranceLimit" type="number" min="0" max="100" step="1"></div>
+            <label class="check"><input type="checkbox" id="backstop"> Lender of last resort</label>
+            <div class="field"><label for="needPct">Depositors who need cash (%)</label><input id="needPct" type="number" min="0" max="100" step="5"></div>
+            <div class="field"><label for="windows">Withdrawal windows</label><input id="windows" type="number" min="1" max="5" step="1"></div>
+          </div>
+          <div class="actions">
+            <button class="btn primary" id="bSetup">Show round to class</button>
+            <button class="btn primary" id="bOpen">Open withdrawals</button>
+            <button class="btn primary" id="bNext">End window</button>
+            <button class="btn primary" id="bReveal">Reveal results</button>
+            <button class="btn secondary" id="bDebrief">Begin debrief</button>
+          </div>
+          <div class="banner"><strong id="instPhase">Lobby</strong><span id="instCounts"></span></div>
+          <p class="msg bad" id="instMsg" aria-live="polite"></p>
+          <div class="actions">
+            <button class="btn secondary hidden" id="bSims">Add 30 simulated depositors</button>
+            <button class="btn secondary" id="bExport">Export CSV</button>
+            <button class="btn danger" id="bReset">Reset</button>
+          </div>
+        </article>
+        <aside class="card">
+          <h2>Session</h2>
+          <div class="joincode" id="instCode">—</div>
+          <p class="note">Students join at <span id="instJoin"></span></p>
+          <p><a id="projLink" target="_blank" rel="noopener">Open the projector screen in a new window</a></p>
+          <div class="banner"><strong>Round sequence</strong>Show round → open withdrawals → end each window → reveal → debrief → replay or next treatment</div>
+          <p class="note" id="modeNote"></p>
+          <div id="instResult"></div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- PROJECTOR -->
+    <section class="view" id="projector"><div class="card" id="projBody"></div></section>
+
+    <p class="footer" id="footer"></p>
+  </main>
+
+<script src="model.js"></script>
+<script src="config.js"></script>
+<script>
+(async () => {
+  'use strict';
+  const M = window.BankRunModel;
+  const CFG = window.BANK_RUN_CONFIG || {};
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const params = new URLSearchParams(location.search);
+  const baseUrl = location.href.split('?')[0].split('#')[0];
+  const sum = a => (a || []).reduce((x, y) => x + y, 0);
+
+  /* ---------- formatting ---------- */
+  const money = x => x == null ? '—' : '$' + Number(x).toLocaleString('en-US', Math.abs(x - Math.round(x)) < 0.005 ? { maximumFractionDigits: 0 } : { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const whole = x => '$' + Math.round(x).toLocaleString('en-US');
+  const pct = x => Math.round(x * 100) + '%';
+  const phaseNames = { lobby: 'Lobby', instructions: 'Instructions', open: 'Withdrawals open', closed: 'Withdrawals closed', revealed: 'Results revealed', debrief: 'Debrief' };
+  const statusText = {
+    sound: ['✔', 'The bank survived', 'It paid every withdrawal and can repay everyone who held, with interest.'],
+    short: ['▲', 'The bank got through today, but holders take a loss', 'It paid every withdrawal. What is left cannot repay the depositors who held.'],
+    closed: ['✖', 'The bank ran out of money and closed', 'It could not pay every withdrawal. Everyone still holding gets nothing from the bank.']
+  };
+
+  /* ---------- load a script only when needed (keeps the local demo offline) ---------- */
+  const loadScript = src => new Promise(res => { const s = document.createElement('script'); s.src = src; s.onload = () => res(true); s.onerror = () => res(false); document.head.appendChild(s); });
+
+  let LIVE = false, sb = null, liveError = '';
+  if (CFG.supabaseUrl && CFG.supabaseAnonKey) {
+    const ok = await loadScript('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2');
+    if (ok && window.supabase) { sb = window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseAnonKey, { auth: { persistSession: false } }); LIVE = true; }
+    else liveError = 'Could not load the Supabase library. Check the network connection.';
+  }
+
+  /* ---------- LOCAL ADAPTER: the same calls as the server, kept in this browser ----------
+     db.wd[round][playerId] = the window that depositor withdrew in. db.guess[round][playerId] = 0..100. */
+  const LKEY = 'acc453-bank-run-v2';
+  const fresh = () => ({ code: 'BANK', phase: 'lobby', roundNo: 0, rounds: {}, players: [], wd: {}, guess: {}, seed: Math.floor(Math.random() * 1e9) });
+  const ldb = () => { try { return JSON.parse(localStorage.getItem(LKEY)) || fresh(); } catch { return fresh(); } };
+  const lsave = db => localStorage.setItem(LKEY, JSON.stringify(db));
+  const hash = s => { let h = 2166136261; for (const c of String(s)) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; };
+  const eligible = (db, r) => db.players.filter(p => p.eligibleFrom <= r);
+  function lstate(db, player) {
+    const rn = db.roundNo, r = db.rounds[rn];
+    let nPlayers = 0, nGuessed = 0, byWindow = [], win = 0, nNeed = null;
+    if (r) {
+      nPlayers = r.nPlayers != null ? r.nPlayers : eligible(db, rn).length;
+      nGuessed = r.nGuessed != null ? r.nGuessed : Object.keys(db.guess[rn] || {}).length;
+      byWindow = db.phase === 'closed' ? r.byWindow.slice(0, -1) : r.byWindow;   // the last window stays hidden until the reveal
+      win = r.window; nNeed = r.nNeed;
+    }
+    let me = null;
+    const p = player && db.players.find(x => x.id === player.id && x.secret === player.secret);
+    if (p) {
+      const need = {}, withdrew = {}, guess = {};
+      for (const k in db.rounds) { if ((db.rounds[k].need || []).includes(p.id)) need[k] = true; if ((db.wd[k] || {})[p.id]) withdrew[k] = db.wd[k][p.id]; if ((db.guess[k] || {})[p.id] != null) guess[k] = db.guess[k][p.id]; }
+      me = { id: p.id, name: p.name, eligibleFrom: p.eligibleFrom, need, withdrew, guess };
+    }
+    const history = Object.values(db.rounds).filter(x => x.revealed).sort((a, b) => a.roundNo - b.roundNo)
+      .map(x => ({ roundNo: x.roundNo, label: x.label, settings: x.settings, nPlayers: x.nPlayers, nGuessed: x.nGuessed, nNeed: x.nNeed, byWindow: x.byWindow, beliefs: x.beliefs }));
+    return { code: db.code, phase: db.phase, roundNo: rn, label: r ? r.label : null, settings: r ? r.settings : null,
+      nJoined: db.players.length, nPlayers, nGuessed, nNeed, window: win, byWindow, history, me };
+  }
+  /* Simulated depositors guess how many will end up withdrawing and leave if, under that guess,
+     holding pays less than the deposit. In window 1 the guess starts from the last round; in later
+     windows it extrapolates from the count on the screen. Illustrative only; see INSTRUCTOR_GUIDE.md. */
+  function simAct(db) {
+    const rn = db.roundNo, r = db.rounds[rn], s = M.cleanSettings(r.settings), n = r.nPlayers, wd = db.wd[rn];
+    if (!n || M.resolveWindows(s, n, r.byWindow).closedInWindow) return;
+    const gs = db.guess[rn] = db.guess[rn] || {}, cum = sum(r.byWindow), needShare = r.nNeed / n;
+    const done = Object.values(db.rounds).filter(x => x.revealed).sort((a, b) => a.roundNo - b.roundNo), last = done[done.length - 1];
+    const prior = last && last.nPlayers ? Math.max(needShare, sum(last.byWindow) / last.nPlayers) : needShare + 0.035;
+    for (const p of eligible(db, rn)) {
+      if (!p.sim) continue;
+      const h = hash(p.id + ':' + rn + ':' + db.seed), u = (h >>> 4) % 1000 / 1000, patience = (h >>> 14) % 1000 / 1000 * 30;   // dollars of expected loss this depositor will sit through
+      let guess;
+      if (r.window === 1) { guess = Math.max(needShare, Math.min(1, prior + (u - 0.5) * 0.2)); if (h % 13 !== 0) gs[p.id] = Math.round(guess * 10) * 10; }
+      else { const share = cum / n; guess = Math.min(1, share + Math.max(0, share - needShare) * (0.3 + u)); }
+      if (wd[p.id]) continue;
+      const hold = M.resolveBank(s, n, Math.min(Math.round(guess * n), n - 1)).perHold;
+      if (hold != null && hold < s.deposit - (r.window === 1 ? 0 : patience) - 1e-9) wd[p.id] = r.window;
+    }
+  }
+  function lfinish(db) {
+    const rn = db.roundNo, r = db.rounds[rn], wd = db.wd[rn] || {}, gs = db.guess[rn] || {};
+    const b = {}; for (const k of ['hold', 'run', 'need']) b[k] = { n: 0, mean: null, bins: Array(11).fill(0), tot: 0 };
+    for (const id in gs) { const g = b[r.need.includes(id) ? 'need' : wd[id] ? 'run' : 'hold']; g.n++; g.tot += gs[id]; g.bins[Math.max(0, Math.min(10, Math.round(gs[id] / 10)))]++; }
+    for (const k in b) { if (b[k].n) b[k].mean = Math.round(b[k].tot / b[k].n * 10) / 10; delete b[k].tot; }
+    r.beliefs = b; r.nGuessed = Object.keys(gs).length; db.phase = 'closed';
+  }
+  const lme = (db, player) => { const p = db.players.find(x => x.id === player.id && x.secret === player.secret); if (!p) throw new Error('Not a participant in this session.'); if (db.phase !== 'open') throw new Error('Withdrawals are not open.'); if (p.eligibleFrom > db.roundNo) throw new Error('You joined after this round began. You are in for the next one.'); return p; };
+  const local = {
+    async state(code, player) { return lstate(ldb(), player); },
+    async join(code, name) {
+      const db = ldb(); name = String(name || '').trim().slice(0, 24);
+      if (!name) throw new Error('Enter a display name.');
+      const p = { id: crypto.randomUUID(), secret: crypto.randomUUID(), name, eligibleFrom: db.phase === 'instructions' ? db.roundNo : db.roundNo + 1, at: Date.now() };
+      db.players.push(p); lsave(db); return { id: p.id, secret: p.secret };
+    },
+    async guess(code, player, g) {
+      const db = ldb(), p = lme(db, player), rn = db.roundNo; g = Math.round(Number(g));
+      if (!(g >= 0 && g <= 100)) throw new Error('Guess a share between 0% and 100%.');
+      if (db.rounds[rn].window !== 1) throw new Error('Guesses close when the first window ends.');
+      (db.guess[rn] = db.guess[rn] || {})[p.id] = g; lsave(db); return lstate(db, player);
+    },
+    async withdraw(code, player, on) {
+      const db = ldb(), p = lme(db, player), rn = db.roundNo, r = db.rounds[rn], wd = db.wd[rn] = db.wd[rn] || {};
+      if (on) { if (!wd[p.id]) wd[p.id] = r.window; }
+      else if (wd[p.id]) { if (r.need.includes(p.id)) throw new Error('You need your cash today.'); if (wd[p.id] !== r.window) throw new Error('That withdrawal is final.'); delete wd[p.id]; }
+      lsave(db); return lstate(db, player);
+    },
+    async host(code, secret, action, payload) {
+      const db = ldb(), ph = db.phase, rn = db.roundNo, r = db.rounds[rn];
+      const publish = () => r.byWindow.push(Object.values(db.wd[rn] || {}).filter(w => w === r.window).length);
+      if (action === 'setup') {
+        const label = String(payload.label || 'Round').trim().slice(0, 60) || 'Round', settings = payload.settings || {};
+        if (ph === 'instructions') Object.assign(r, { label, settings });
+        else if (['lobby', 'revealed', 'debrief'].includes(ph)) { db.roundNo++; db.rounds[db.roundNo] = { roundNo: db.roundNo, label, settings, window: 0, byWindow: [], need: [], nNeed: null, nPlayers: null, nGuessed: null, beliefs: null, revealed: false }; db.phase = 'instructions'; }
+      } else if (action === 'open' && ph === 'instructions') {
+        const list = eligible(db, rn), s = M.cleanSettings(r.settings), ids = list.map(p => p.id);
+        for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }
+        r.nPlayers = list.length; r.nNeed = Math.round(list.length * s.needPct / 100); r.need = ids.slice(0, r.nNeed);
+        db.wd[rn] = {}; r.need.forEach(id => db.wd[rn][id] = 1);
+        r.window = 1; r.byWindow = []; db.phase = 'open'; simAct(db);
+      } else if (action === 'next' && ph === 'open') {
+        publish();
+        if (r.window < M.cleanSettings(r.settings).windows) { r.window++; simAct(db); } else lfinish(db);
+      } else if (action === 'close' && ph === 'open') { publish(); lfinish(db); }
+      else if (action === 'reveal' && ph === 'closed') { r.revealed = true; db.phase = 'revealed'; }
+      else if (action === 'debrief' && ph === 'revealed') db.phase = 'debrief';
+      lsave(db); return lstate(db, null);
+    },
+    async exportRows() {
+      const db = ldb(), rows = [];
+      for (const r of Object.values(db.rounds)) if (r.revealed || r.beliefs) for (const p of eligible(db, r.roundNo)) rows.push({ roundNo: r.roundNo, name: p.name, need: r.need.includes(p.id), window: (db.wd[r.roundNo] || {})[p.id] || null, guess: (db.guess[r.roundNo] || {})[p.id] ?? null });
+      return rows;
+    },
+    addSims(k) { const db = ldb(); const start = db.players.filter(p => p.sim).length; const from = db.phase === 'instructions' ? db.roundNo : db.roundNo + 1;
+      for (let i = 1; i <= k; i++) db.players.push({ id: 'sim-' + (start + i), secret: 'sim', name: 'Depositor ' + (start + i), eligibleFrom: from, sim: true, at: Date.now() }); lsave(db); },
+    reset() { localStorage.removeItem(LKEY); }
+  };
+
+  /* ---------- LIVE ADAPTER: Supabase functions from supabase/schema.sql ---------- */
+  const rpc = async (fn, args) => { const { data, error } = await sb.rpc(fn, args); if (error) throw new Error(error.message); return data; };
+  const live = {
+    state: (code, pl) => rpc('br_state', { p_code: code, p_player: pl ? pl.id : null, p_secret: pl ? pl.secret : null }),
+    join: (code, name) => rpc('br_join', { p_code: code, p_name: name }),
+    guess: (code, pl, g) => rpc('br_guess', { p_code: code, p_player: pl.id, p_secret: pl.secret, p_guess: g }),
+    withdraw: (code, pl, on) => rpc('br_withdraw', { p_code: code, p_player: pl.id, p_secret: pl.secret, p_on: on }),
+    host: (code, secret, action, payload) => rpc('br_host', { p_code: code, p_secret: secret, p_action: action, p_payload: payload || {} }),
+    exportRows: (code, secret) => rpc('br_export', { p_code: code, p_secret: secret }),
+    create: key => rpc('br_create_session', { p_key: key })
+  };
+  const api = LIVE ? live : local;
+
+  /* ---------- who am I on this device ---------- */
+  // Live: remembered across refreshes and tab closes. Local demo: per tab, so several tabs can be several students.
+  const idStore = LIVE ? localStorage : sessionStorage;
+  const readJSON = (store, k) => { try { return JSON.parse(store.getItem(k)); } catch { return null; } };
+  let player = readJSON(idStore, 'bankrun-player');
+  let host = LIVE ? readJSON(localStorage, 'bankrun-host') : { code: 'BANK', hostSecret: 'local' };
+  let view = ['student', 'instructor', 'projector'].includes(params.get('view')) ? params.get('view') : 'student';
+  let code = LIVE ? (params.get('code') || (view === 'student' ? player && player.code : host && host.code) || '').toUpperCase() : 'BANK';
+  if (player && LIVE && code && player.code !== code) player = null;
+  let S = null, lastSig = '', channel = null;
+
+  /* ---------- rules text, built from the round's settings ---------- */
+  function rulesFor(s) {
+    s = M.cleanSettings(s); const d = s.deposit, K = s.windows, out = [];
+    out.push(`Each of you has ${money(d)} in the bank. For every $100 of deposits the bank holds $${s.cashPct} in cash; the other $${100 - s.cashPct} is in loans that are repaid later.`);
+    if (s.lossPct > 0) out.push(`Bad news: ${s.lossPct}% of those loans will never be repaid.`);
+    if (s.needPct > 0) out.push(`${s.needPct}% of you, picked at random, <b>need cash today</b> and will withdraw. Your phone tells you privately if you are one of them.`);
+    out.push(`<b>Hold</b> and you receive ${money(d + s.holdBonus)} (your deposit plus ${money(s.holdBonus)} of interest), as long as the bank can pay it.`);
+    out.push(`<b>Withdraw</b> and you receive ${money(d)} today, as long as the bank can pay.`);
+    if (K > 1) out.push(`There are ${K} withdrawal windows. After each one, the number who have withdrawn goes on the screen. If you are holding, you can still withdraw in a later window. Once a window ends, a withdrawal is final.`);
+    if (s.backstop) out.push('If the cash runs out, the central bank lends the bank cash against its good loans, dollar for dollar.');
+    else if (s.salePricePct > 0) out.push(`If the cash runs out, the bank must sell loans today at ${s.salePricePct} cents on the dollar.`);
+    else out.push('The loans cannot be sold today. Cash is all the bank has to pay withdrawals.');
+    if (K > 1) out.push('The bank pays each window in turn. If it cannot pay a window in full, it closes: the depositors in that window split what is left equally, and everyone still holding gets nothing from the bank.');
+    else out.push('If the bank cannot pay every withdrawal, it closes. Withdrawers split what there is equally (being first does not help), and holders get nothing from the bank.');
+    out.push(s.insurance ? `<b>Deposit insurance is on.</b> Whatever happens to the bank, you receive at least ${money(Math.min(s.insuranceLimit, d))}.` : 'There is no deposit insurance.');
+    out.push('Doing nothing counts as holding.');
+    return '<ul class="rules">' + out.map(x => `<li>${x}</li>`).join('') + '</ul>';
+  }
+  const badges = s => `<div class="badges"><span class="badge ${s.insurance ? 'on' : ''}">Deposit insurance: ${s.insurance ? 'ON, up to ' + money(Math.min(s.insuranceLimit, s.deposit)) : 'off'}</span><span class="badge ${s.backstop ? 'on' : ''}">Lender of last resort: ${s.backstop ? 'ON' : 'off'}</span></div>`;
+  function balanceSheet(s, n) {
+    const r = M.resolveBank(s, Math.max(n, 1), 0), per = n < 1;
+    return `<div class="taccount"><div><h4>Assets</h4><p><span>Cash reserves</span><span>${whole(r.cash)}</span></p><p><span>Loans (repaid later)</span><span>${whole(r.loansFace)}</span></p>${r.loanLoss > 0 ? `<p class="minor"><span>of which will never be repaid</span><span>${whole(r.loanLoss)}</span></p>` : ''}</div>
+      <div><h4>Liabilities</h4><p><span>Deposits</span><span>${whole(r.deposits)}</span></p><p class="minor"><span>${per ? 'shown per depositor' : n + ' depositors × ' + money(s.deposit)}</span><span></span></p></div></div>`;
+  }
+  /* The count so far against the bank's limits. */
+  function meter(s, n, nNeed, cum) {
+    if (!n) return '';
+    const t = M.thresholds(s, n), p = k => (k / n * 100).toFixed(1), mk = [];
+    if (nNeed > 0) mk.push([nNeed, `${nNeed} need cash`, 'up']);
+    if (t.maxSafe >= 0 && t.maxSafe < n) mk.push([t.maxSafe, `Holders lose beyond ${t.maxSafe}`, 'down']);
+    if (t.maxMet < n) mk.push([t.maxMet, `Bank closes beyond ${t.maxMet}`, 'up']);
+    const note = t.maxSafe < 0 ? 'Holders take a loss in this bank even if nobody else withdraws.' : t.maxSafe >= n ? 'No number of withdrawals costs the holders anything in this round.' : '';
+    return `<div class="meter" role="img" aria-label="${cum} of ${n} depositors have withdrawn. ${mk.map(m => m[1]).join('. ')}."><div class="fill" style="width:${p(cum)}%"></div>${mk.map(m => `<i class="mk ${m[2]}${m[0] / n > 0.7 ? ' left' : ''}" style="left:${p(m[0])}%"><span>${m[1]}</span></i>`).join('')}</div>${note ? `<p class="note">${note}</p>` : ''}`;
+  }
+  /* Window by window: who left, and what the bank had to do to pay them. */
+  function unfold(s, n, byWindow, nNeed, final) {
+    let cum = 0, shut = false;
+    const rows = byWindow.map((c, i) => {
+      const was = shut; cum += c; const b = M.resolveBank(s, n, cum); let st;
+      if (was && !c) return '';
+      if (was) st = 'closed';
+      else if (b.closed) { st = '✖ ran out of money'; shut = true; }
+      else if (b.saleProceeds > 0.005) st = `selling loans at ${s.salePricePct}¢`;
+      else if (b.fedLoan > 0.005) st = 'borrowing from the central bank';
+      else st = 'cash covers it';
+      return `<tr><td>Window ${i + 1}</td><td>${c}${i === 0 && nNeed ? ` (${Math.min(nNeed, c)} needed cash)` : ''}</td><td>${cum} of ${n} (${pct(cum / n)})</td><td>${st}</td>${final ? `<td>${money(final.perWindow[i])}</td>` : ''}</tr>`;
+    }).join('');
+    return `<div class="scroll"><table><thead><tr><th>Window</th><th>Withdrew</th><th>Total so far</th><th>The bank</th>${final ? '<th>Each received</th>' : ''}</tr></thead><tbody>${rows}</tbody></table></div>`;
+  }
+
+  /* ---------- results ---------- */
+  const resultOf = h => M.resolveWindows(h.settings, h.nPlayers, h.byWindow);
+  const costOf = (h, r) => M.runCost(h.settings, h.nPlayers, h.nNeed, r);
+  const currentHist = () => S && S.history.find(h => h.roundNo === S.roundNo);
+  const withdrawerLine = r => r.closedInWindow ? r.perWindow.map((v, i) => v == null ? null : `window ${i + 1}: ${money(v)}`).filter(Boolean).join(' · ') : money(r.perWithdraw);
+  /* The headline of every reveal: what the run cost, against the same bank with no run. */
+  function lead(h, r, cost) {
+    const n = r.n, d = r.settings.deposit, others = n - h.nNeed;
+    const baseLine = cost.baseSound ? 'This bank was sound.' : 'This bank could not repay everyone even with no run.';
+    const noRun = h.nNeed > 0 ? `If only the ${h.nNeed} who needed cash had withdrawn, each of the other ${others} would have received ${money(cost.base.perHold)}.` : `If nobody had withdrawn, every depositor would have received ${money(cost.base.perHold)}.`;
+    let hind;
+    if (r.closedInWindow && !r.settings.insurance) hind = `In hindsight, everyone still in the bank when window ${r.closedInWindow} opened would have done better to leave sooner.`;
+    else if (r.h > 0 && r.perHold < d - 0.005) hind = `In hindsight, all ${r.h} who were still holding would have done better to withdraw early.`;
+    else if (cost.ran > 0 && r.h > 0 && r.perHold > d + 0.005) hind = `In hindsight, the ${cost.ran} who withdrew without needing to gave up ${money(r.perHold - d)} each.`;
+    else hind = 'In hindsight, nobody would change their choice.' + (cost.ran > 0 ? ' Once everyone else is leaving, leaving is the best you can do.' : '');
+    const paid = r.fdicPaid > 0.005 ? ` Deposit insurance paid ${whole(r.fdicPaid)} to make depositors whole.` : '';
+    return `<div class="label">${baseLine}</div><div class="lead">${cost.ran === 0 ? 'Nobody ran' : whole(cost.destroyed) + ' lost to the run'}</div>
+      <p class="sub">${noRun}${paid}</p><p><b>${hind}</b></p>`;
+  }
+  function beliefs(h, r) {
+    const b = h.beliefs || {}, g = k => Object.assign({ n: 0, mean: null, bins: Array(11).fill(0) }, b[k] || {}), hold = g('hold'), run = g('run');
+    if (!hold.n && !run.n) return '';
+    const max = Math.max(1, ...hold.bins.map((x, i) => x + run.bins[i])), act = Math.round(r.share * 10), pc = m => m == null ? '—' : Math.round(m) + '%';
+    return `<h3>What depositors expected</h3><p class="note">Before the first window, everyone guessed what share of the class would withdraw. Depositors who needed cash are left out.</p>
+      <div class="tiles three"><div class="tile"><small>Those who held guessed (${hold.n})</small><strong>${pc(hold.mean)}</strong></div><div class="tile"><small>Those who ran guessed (${run.n})</small><strong>${pc(run.mean)}</strong></div><div class="tile"><small>Actually withdrew</small><strong>${pct(r.share)}</strong></div></div>
+      <div class="hist" role="img" aria-label="Guesses in steps of ten percent. Held: ${hold.bins.join(', ')}. Ran: ${run.bins.join(', ')}.">${hold.bins.map((x, i) => `<div class="hcol${i === act ? ' act' : ''}"><div class="hbar"><i style="height:${run.bins[i] / max * 64}px;background:var(--wd)" title="${run.bins[i]} who ran guessed ${i * 10}%"></i><i style="height:${x / max * 64}px;background:var(--hold)" title="${x} who held guessed ${i * 10}%"></i></div><small>${i * 10}%${i === act ? '<br>▲ actual' : ''}</small></div>`).join('')}</div>
+      <div class="legend"><span><i class="sw" style="background:var(--hold)"></i>Held</span><span><i class="sw" style="background:var(--wd)"></i>Ran</span><span>Bar height: number of depositors who made that guess</span></div>`;
+  }
+  function sourcesBar(r) {
+    const parts = [['Cash reserves', r.cashUsed, '#102a35'], ['Loan sales', r.saleProceeds, '#087d75'], ['Central bank loan', r.fedLoan, '#d6a13b'], ['Not paid', r.unpaidToday, '#c9cfcc']].filter(p => p[1] > 0.005);
+    if (!parts.length) return '<p class="note">No one withdrew, so the bank paid nothing out today.</p>';
+    return `<div class="stack" role="img" aria-label="${parts.map(p => p[0] + ' ' + whole(p[1])).join(', ')}">${parts.map(p => `<i style="flex:${p[1]};background:${p[2]}" title="${p[0]}: ${whole(p[1])}"></i>`).join('')}</div>
+      <div class="legend">${parts.map(p => `<span><i class="sw" style="background:${p[2]}"></i>${p[0]} ${whole(p[1])}</span>`).join('')}</div>`;
+  }
+  function payoffChart(s, n, w, nNeed) {
+    const pts = M.payoffCurve(s, n), W = 720, H = 250, L = 52, R = 18, T = 14, B = 44, pw = W - L - R, ph = H - T - B, ymax = s.deposit * 1.1;
+    const x = k => L + (n ? k / n : 0) * pw, y = v => T + ph - Math.min(v, ymax) / ymax * ph;
+    const line = key => pts.filter(p => p[key] != null).map(p => `${x(p.k).toFixed(1)},${y(p[key]).toFixed(1)}`).join(' ');
+    const grid = [0, 25, 50, 75, 100].map(v => `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="#e3e8e5"/><text x="${L - 8}" y="${y(v) + 4}" text-anchor="end" font-size="12" fill="#5d6e73">$${v}</text>`).join('');
+    const xt = [0, .25, .5, .75, 1].map(f => `<text x="${L + f * pw}" y="${H - B + 18}" text-anchor="middle" font-size="12" fill="#5d6e73">${f * 100}%</text>`).join('');
+    const here = pts[w], mx = x(w);
+    const dotH = here.hold != null ? `<circle cx="${mx}" cy="${y(here.hold)}" r="6" fill="var(--hold)" stroke="#fff" stroke-width="2"/>` : '';
+    const dotW = here.withdraw != null ? `<rect x="${mx - 6}" y="${y(here.withdraw) - 6}" width="12" height="12" fill="var(--wd)" stroke="#fff" stroke-width="2"/>` : '';
+    const anchor = mx > W - 150 ? 'end' : 'start';
+    const needMark = nNeed > 0 && nNeed !== w ? `<line x1="${x(nNeed)}" x2="${x(nNeed)}" y1="${T + 20}" y2="${T + ph}" stroke="#5d6e73" stroke-width="1.5" stroke-dasharray="2 4"/><text x="${x(nNeed)}" y="${T + ph - 6}" dx="${nNeed < w ? -6 : 6}" text-anchor="${nNeed < w ? 'end' : 'start'}" font-size="12" fill="#5d6e73">No run: ${pct(nNeed / n)}</text>` : '';
+    return `<div class="legend" style="margin-bottom:4px"><span><svg width="34" height="12" aria-hidden="true"><line x1="0" x2="34" y1="6" y2="6" stroke="var(--hold)" stroke-width="3"/><circle cx="17" cy="6" r="4.5" fill="var(--hold)"/></svg>What a holder receives</span><span><svg width="34" height="12" aria-hidden="true"><line x1="0" x2="34" y1="6" y2="6" stroke="var(--wd)" stroke-width="3" stroke-dasharray="7 4"/><rect x="13" y="2" width="8" height="8" fill="var(--wd)"/></svg>What a withdrawer receives (the average, if the bank closes)</span></div>
+      <div class="chartwrap" id="chartWrap" data-n="${n}"><div class="tip" id="chartTip"></div>
+      <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Payout to a holder and to a withdrawer at every possible share of depositors withdrawing. This round, ${pct(n ? w / n : 0)} withdrew.">
+        ${grid}${xt}<text x="${L + pw / 2}" y="${H - 6}" text-anchor="middle" font-size="12.5" fill="#5d6e73">Share of depositors who withdraw</text>
+        <polyline points="${line('hold')}" fill="none" stroke="var(--hold)" stroke-width="3" stroke-linejoin="round"/>
+        <polyline points="${line('withdraw')}" fill="none" stroke="var(--wd)" stroke-width="3" stroke-dasharray="7 4" stroke-linejoin="round"/>
+        ${needMark}
+        <line x1="${mx}" x2="${mx}" y1="${T}" y2="${T + ph}" stroke="#152f39" stroke-width="1.5"/>
+        <text x="${mx}" y="${T + 11}" dx="${anchor === 'end' ? -7 : 7}" text-anchor="${anchor}" font-size="12.5" font-weight="700" fill="#152f39">This round: ${pct(n ? w / n : 0)}</text>
+        ${dotH}${dotW}
+        <line id="chartCross" x1="0" x2="0" y1="${T}" y2="${T + ph}" stroke="#5d6e73" stroke-dasharray="3 3" visibility="hidden"/>
+        <rect id="chartHit" x="${L}" y="${T}" width="${pw}" height="${ph}" fill="transparent"/>
+      </svg></div>
+      <details><summary>Payout table</summary><div class="scroll"><table><thead><tr><th>Share withdrawing</th><th>Withdrawer receives</th><th>Holder receives</th><th>Bank</th></tr></thead><tbody>${
+        [...new Set([0, .1, .2, .3, .4, .5, .6, .7, .8, .9, 1].map(f => Math.round(f * n)))].map(k => { const p = pts[k]; return `<tr><td>${k} of ${n} (${pct(n ? k / n : 0)})</td><td>${money(p.withdraw)}</td><td>${money(p.hold)}</td><td>${{ sound: 'survives', short: 'holders lose', closed: 'closes' }[p.status]}</td></tr>`; }).join('')
+      }</tbody></table></div></details>`;
+  }
+  function wireChart(s, n) {
+    const wrap = $('chartWrap'), hit = $('chartHit'); if (!wrap || !hit) return;
+    const pts = M.payoffCurve(s, n), tip = $('chartTip'), cross = $('chartCross'), svg = wrap.querySelector('svg');
+    const move = ev => {
+      const box = svg.getBoundingClientRect(), sx = (ev.clientX - box.left) / box.width * 720;
+      const k = Math.max(0, Math.min(n, Math.round((sx - 52) / (720 - 52 - 18) * n))), p = pts[k], cx = 52 + (n ? k / n : 0) * (720 - 52 - 18);
+      cross.setAttribute('x1', cx); cross.setAttribute('x2', cx); cross.setAttribute('visibility', 'visible');
+      tip.innerHTML = `<b>${k} of ${n} withdraw (${pct(n ? k / n : 0)})</b><br>Withdrawer: ${money(p.withdraw)}<br>Holder: ${money(p.hold)}`;
+      tip.style.display = 'block'; tip.style.left = Math.max(90, Math.min(box.width - 90, cx / 720 * box.width)) + 'px'; tip.style.top = (ev.clientY - box.top) + 'px';
+    };
+    hit.addEventListener('pointermove', move); hit.addEventListener('pointerdown', move);
+    hit.addEventListener('pointerleave', () => { tip.style.display = 'none'; cross.setAttribute('visibility', 'hidden'); });
+  }
+  function comparison() {
+    if (!S.history.length) return '';
+    return `<h3>Round comparison</h3><div class="scroll"><table><thead><tr><th>Round</th><th>Withdrew</th><th>Needed cash</th><th>Ran</th><th>Lost to the run</th><th>Outside money</th><th>Holder got</th><th>Bank</th></tr></thead><tbody>${S.history.map(h => { const r = resultOf(h), c = costOf(h, r), outside = r.fedLoan + r.fdicPaid;
+      return `<tr><td>${h.roundNo}. ${esc(h.label)}</td><td>${r.w + r.late} of ${r.n} (${pct((r.w + r.late) / Math.max(r.n, 1))})</td><td>${h.nNeed}</td><td>${c.ran}</td><td>${whole(c.destroyed)}</td><td>${outside > 0.005 ? whole(outside) : '—'}</td><td>${money(r.perHold)}</td><td>${{ sound: '✔ survived', short: '▲ holders lost', closed: '✖ closed' }[r.status]}</td></tr>`; }).join('')}</tbody></table></div>`;
+  }
+
+  /* ---------- PROJECTOR ---------- */
+  function renderProjector() {
+    const joinLine = `<p class="note">Join at <b>${esc(baseUrl)}</b>${LIVE ? ` · code <b>${esc(S.code)}</b>` : ''} · ${S.nJoined} joined</p>`;
+    if (S.phase === 'lobby') return `<div class="label">Bank Run</div><h2>Join the bank</h2><div class="split"><div><p class="sub">Open this page on your phone and enter the code.</p><div class="joincode">${esc(S.code)}</div><p style="word-break:break-all"><b>${esc(baseUrl)}</b></p><p class="banner"><strong>${S.nJoined} joined</strong>Waiting for the instructor to set up the first round.</p></div><div id="qr"></div></div>`;
+    const s = M.cleanSettings(S.settings), K = s.windows, n = S.nPlayers, head = `<div class="label">Round ${S.roundNo} · ${esc(S.label)}</div>`;
+    if (S.phase === 'instructions')
+      return `${head}<h2>Hold or withdraw?</h2><div class="split"><div>${balanceSheet(s, n)}${badges(s)}<div class="banner"><strong style="font-size:1.4em">Read the rules</strong>Withdrawals open in a moment.</div>${joinLine}</div><div>${rulesFor(s)}</div></div>${comparison()}`;
+    if (S.phase === 'open' || S.phase === 'closed') {
+      const cum = sum(S.byWindow), now = M.resolveWindows(s, n, S.byWindow), shut = now.closedInWindow > 0;
+      let st;
+      if (S.phase === 'closed') st = ['Withdrawals are closed', 'The last window has not been counted yet. Results in a moment.', ''];
+      else if (shut) st = ['✖ The bank has run out of money', `It could not pay everyone who asked in window ${now.closedInWindow}. No more withdrawals.`, 'bad'];
+      else st = [`Window ${S.window} of ${K} is open`, S.window === 1 ? `${S.nGuessed} of ${n} guesses in. Make your guess, then hold or withdraw on your phone.` : 'If you are holding, you can still withdraw on your phone. Doing nothing keeps you holding.', 'warn'];
+      return `${head}<h2>${S.byWindow.length ? `${cum} of ${n} have withdrawn so far` : s.needPct > 0 ? `${S.nNeed} of ${n} depositors need cash today` : 'Hold or withdraw?'}</h2>${meter(s, n, S.nNeed, cum)}
+        <div class="split"><div><div class="banner ${st[2]}"><strong style="font-size:1.4em">${st[0]}</strong>${st[1]}</div>${S.byWindow.length ? unfold(s, n, S.byWindow, S.nNeed) : ''}${joinLine}</div><div>${balanceSheet(s, n)}${badges(s)}</div></div>${comparison()}`;
+    }
+    const h = currentHist(); if (!h) return head + '<p>Waiting for results.</p>';
+    const r = resultOf(h), st = statusText[r.status], cost = costOf(h, r), all = r.w + r.late;
+    return `${head}<div class="split"><div>
+        ${lead(h, r, cost)}
+        <div class="headline ${r.status}"><span class="icon" aria-hidden="true">${st[0]}</span><span><b>${st[1]}</b>${st[2]}</span></div>
+        <div class="tiles" style="grid-template-columns:1fr 1fr"><div class="tile"><small>Each withdrawer received</small><strong style="${r.closedInWindow ? 'font-size:1.05rem;letter-spacing:0' : ''}">${withdrawerLine(r)}</strong></div><div class="tile"><small>Each holder received</small><strong>${money(r.perHold)}</strong></div></div>
+      </div><div>
+        <h3 style="margin-top:0">${pct(all / Math.max(r.n, 1))} withdrew: ${all} of ${r.n}. ${h.nNeed} needed cash, ${cost.ran} ran.</h3>
+        ${meter(s, r.n, h.nNeed, all)}${unfold(s, r.n, h.byWindow, h.nNeed, r)}
+        ${beliefs(h, r)}
+      </div></div>
+      <div class="split" style="margin-top:14px"><div>
+        <h3 style="margin-top:0">Where today's ${whole(r.requested)} of withdrawals came from</h3>${sourcesBar(r)}
+        <div class="tiles three">
+          <div class="tile"><small>Cash paid out</small><strong>${whole(r.cashUsed)}</strong></div>
+          <div class="tile"><small>Loans sold</small><strong>${whole(r.loansSold)}</strong></div>
+          <div class="tile"><small>Lost in forced sales</small><strong>${whole(r.saleLoss)}</strong></div>
+          <div class="tile"><small>Left for holders</small><strong>${whole(r.paidHolders)}</strong></div>
+          <div class="tile out"><small>Outside money: central bank loan</small><strong>${s.backstop ? whole(r.fedLoan) : '—'}</strong></div>
+          <div class="tile out"><small>Outside money: deposit insurance paid</small><strong>${s.insurance ? whole(r.fdicPaid) : '—'}</strong></div>
+        </div>${badges(s)}
+      </div><div>
+        <h3 style="margin-top:0">What each choice pays, at every size of run</h3>${payoffChart(s, r.n, r.w, h.nNeed)}
+      </div></div>${comparison()}`;
+  }
+
+  /* ---------- STUDENT ---------- */
+  function studentOpen(me) {
+    const s = M.cleanSettings(S.settings), rn = S.roundNo, K = s.windows, n = S.nPlayers, need = !!me.need[rn], wdWin = me.withdrew[rn], guess = me.guess[rn];
+    const cum = sum(S.byWindow), shut = M.resolveWindows(s, n, S.byWindow).closedInWindow > 0, t = M.thresholds(s, n);
+    const limit = t.maxSafe >= 0 && t.maxSafe < n ? ` Holders start to lose beyond ${t.maxSafe}.` : '';
+    let html = `<h2>${K > 1 ? `Window ${S.window} of ${K}` : 'Hold or withdraw?'}</h2>`;
+    html += S.byWindow.length ? `<div class="banner warn"><strong>${cum} of ${n} have withdrawn so far</strong>${S.nNeed} of them needed cash.${limit}</div>`
+      : s.needPct > 0 ? `<p class="sub">${S.nNeed} of ${n} depositors need cash today and will withdraw.${limit}</p>` : '';
+    if (S.window === 1 && !shut) html += `<h3>${guess == null ? 'First, your guess' : 'Your guess'}</h3><p class="note">By the end of this round, what share of the class will have withdrawn? Tap again to change it until this window ends.</p>
+        <div class="chips">${[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map(g => `<button class="chip" data-guess="${g}" aria-pressed="${guess === g}">${g}%</button>`).join('')}</div>`;
+    if (need) html += `<div class="banner"><strong>💵 You need your cash today</strong>Your withdrawal is in. You receive $${s.deposit} if the bank can pay. Nothing else to decide this round.</div>`;
+    else if (wdWin && wdWin < S.window) html += `<div class="banner"><strong>💵 You withdrew in window ${wdWin}</strong>That withdrawal is final.</div>`;
+    else if (shut) html += `<div class="banner bad"><strong>✖ The bank has run out of money</strong>No more withdrawals. You are still holding.</div>`;
+    else if (wdWin) html += `<div class="banner warn"><strong>💵 Withdrawal requested</strong>It becomes final when this window ends.</div><button class="choice wide" data-wd="0"><b>🏦 Undo: keep holding</b><span>Leave my $${s.deposit} in the bank after all.</span></button>`;
+    else if (S.window === 1 && guess == null) html += `<p class="sub">Make your guess to see your choices.</p>`;
+    else html += `<div class="banner"><strong>🏦 You are holding</strong>Doing nothing keeps you holding.${K > 1 ? (S.window < K ? ' You can still withdraw in a later window.' : ' This is the last window.') : ''}</div><button class="choice wide" data-wd="1"><b>💵 Withdraw now</b><span>Take my $${s.deposit} out of the bank.</span></button>`;
+    return html + '<p class="msg" id="receipt"></p>';
+  }
+  function renderStudent() {
+    const joined = !!(player && S && S.me);
+    $('joinForm').classList.toggle('hidden', joined);
+    $('codeField').classList.toggle('hidden', !LIVE || !!params.get('code'));
+    if (!S) { $('studentBody').innerHTML = ''; $('sLabel').textContent = 'Bank Run'; return; }
+    $('sLabel').textContent = S.roundNo ? `Round ${S.roundNo} · ${S.label}` : 'Bank Run';
+    $('studentRules').innerHTML = S.settings ? rulesFor(S.settings) : '<p class="sub">The rules for each round appear here once the instructor sets it up.</p>';
+    if (!joined) { $('studentBody').innerHTML = ''; return; }
+    const me = S.me, rn = S.roundNo, inRound = rn > 0 && me.eligibleFrom <= rn, w = me.withdrew[rn];
+    const mineIn = S.history.filter(h => me.eligibleFrom <= h.roundNo);
+    const total = mineIn.reduce((t, h) => t + (M.payoutFor(resultOf(h), me.withdrew[h.roundNo]) || 0), 0), played = mineIn.length;
+    let html = '';
+    if (S.phase === 'lobby') html = `<h2>You're in, ${esc(me.name)}</h2><p class="sub">Waiting for the instructor to set up the first round.</p>`;
+    else if (!inRound) html = `<h2>You're in, ${esc(me.name)}</h2><div class="banner warn"><strong>This round began before you joined.</strong>You play from the next round.</div>`;
+    else if (S.phase === 'instructions') html = `<h2>Get ready</h2><p class="sub">Read the rules. The instructor will open withdrawals in a moment.</p>${balanceSheet(S.settings, 0)}${badges(M.cleanSettings(S.settings))}`;
+    else if (S.phase === 'open') html = studentOpen(me);
+    else if (S.phase === 'closed') html = `<h2>Withdrawals are closed</h2><div class="banner"><strong>${me.need[rn] ? 'You needed cash and withdrew' : w ? 'You withdrew in window ' + w : 'You held'}</strong>Waiting for the instructor to reveal what happened to the bank.</div>`;
+    else {
+      const h = currentHist(); if (h) { const r = resultOf(h), pay = M.payoutFor(r, w), top = pay - M.bankPayoutFor(r, w), st = statusText[r.status], g = me.guess[rn], all = r.w + r.late;
+        const did = me.need[rn] ? 'You needed cash and <b>withdrew</b>' : w ? `You <b>withdrew</b> in window ${w}` : 'You <b>held</b>';
+        html = `<h2>Your result</h2><p class="sub">${did}. ${all} of ${r.n} depositors withdrew; ${h.nNeed} of them needed cash.</p><div class="bigpay">${money(pay)}</div>
+          ${top > 0.005 ? `<p class="note">${money(pay - top)} from the bank and ${money(top)} from deposit insurance.</p>` : ''}
+          <div class="headline ${r.status}"><span class="icon" aria-hidden="true">${st[0]}</span><span><b>${st[1]}</b>${st[2]}</span></div>
+          <table><tbody><tr><td>Each withdrawer received</td><td>${withdrawerLine(r)}</td></tr><tr><td>Each holder received</td><td>${money(r.perHold)}</td></tr>
+          ${g != null ? `<tr><td>You guessed / actually withdrew</td><td>${g}% / ${pct(all / Math.max(r.n, 1))}</td></tr>` : ''}
+          <tr><td>Your total over ${played} round${played === 1 ? '' : 's'}</td><td><b>${money(total)}</b></td></tr></tbody></table>`; }
+    }
+    $('studentBody').innerHTML = html;
+    document.querySelectorAll('[data-guess]').forEach(b => b.onclick = () => act(async () => { S = await api.guess(code, player, Number(b.dataset.guess)); }, 'receipt'));
+    document.querySelectorAll('[data-wd]').forEach(b => b.onclick = () => act(async () => { S = await api.withdraw(code, player, b.dataset.wd === '1'); }, 'receipt'));
+  }
+
+  /* ---------- INSTRUCTOR ---------- */
+  const fields = ['cashPct', 'salePricePct', 'lossPct', 'insuranceLimit', 'needPct', 'windows'];
+  function fillForm(id) {
+    const p = M.PRESETS.find(x => x.id === id), s = p ? M.presetSettings(id) : null;
+    $('presetNote').textContent = p ? p.note : 'Custom settings. Edit the numbers below.';
+    if (!p) return;
+    $('roundLabel').value = p.label; fields.forEach(f => $(f).value = s[f]); $('insurance').checked = s.insurance; $('backstop').checked = s.backstop;
+  }
+  const readForm = () => { const o = { insurance: $('insurance').checked, backstop: $('backstop').checked }; fields.forEach(f => o[f] = $(f).value); return M.cleanSettings(o); };
+  const bankShut = () => S && S.phase === 'open' && M.resolveWindows(S.settings, S.nPlayers, S.byWindow).closedInWindow > 0;
+  function renderInstructor() {
+    const needHost = LIVE && !(host && host.code);
+    $('hostGate').classList.toggle('hidden', !needHost); $('hostPanel').classList.toggle('hidden', needHost);
+    if (needHost || !S) return;
+    const ph = S.phase, K = S.settings ? M.cleanSettings(S.settings).windows : 1, shut = bankShut();
+    const enable = { bSetup: ['lobby', 'instructions', 'revealed', 'debrief'], bOpen: ['instructions'], bNext: ['open'], bReveal: ['closed'], bDebrief: ['revealed'] };
+    const nextBtn = { lobby: 'bSetup', instructions: 'bOpen', open: 'bNext', closed: 'bReveal', revealed: 'bSetup', debrief: 'bSetup' }[ph];
+    for (const id in enable) { $(id).disabled = !enable[id].includes(ph) || (id === 'bOpen' && S.nPlayers < 1); $(id).classList.toggle('next', id === nextBtn && !$(id).disabled); }
+    $('bSetup').textContent = ph === 'instructions' ? 'Update round' : ph === 'lobby' ? 'Show round to class' : 'Show next round';
+    $('bNext').textContent = ph !== 'open' ? 'End window' : shut ? 'End round: the bank has closed' : S.window < K ? `End window ${S.window} of ${K}` : K > 1 ? 'End the last window' : 'Close withdrawals';
+    $('instPhase').textContent = (S.roundNo ? `Round ${S.roundNo} · ${S.label} · ` : '') + phaseNames[ph] + (ph === 'open' && K > 1 ? ` · window ${S.window} of ${K}` : '');
+    $('instCounts').textContent = `${S.nJoined} joined` + (S.roundNo ? ` · ${S.nPlayers} in this round · ${S.nGuessed} guesses in` : '') + (S.byWindow.length ? ` · ${sum(S.byWindow)} withdrew so far` : '') + (ph === 'instructions' && S.nPlayers < 1 ? ' · needs at least one depositor before opening' : '') + (ph === 'revealed' || ph === 'debrief' ? ' · Show next round replays this treatment unless you pick another' : '');
+    $('instCode').textContent = S.code; $('instJoin').textContent = LIVE ? `${baseUrl}?code=${S.code}` : baseUrl;
+    $('projLink').href = `${baseUrl}?view=projector${LIVE ? '&code=' + S.code : ''}`;
+    const h = currentHist();
+    $('instResult').innerHTML = h && (ph === 'revealed' || ph === 'debrief') ? (() => { const r = resultOf(h), c = costOf(h, r); return `<div class="headline ${r.status}"><span class="icon" aria-hidden="true">${statusText[r.status][0]}</span><span><b>${c.ran} ran · ${whole(c.destroyed)} lost</b>${r.w + r.late} of ${r.n} withdrew · holders ${money(r.perHold)}</span></div>`; })() : '';
+  }
+
+  /* ---------- shell ---------- */
+  function render() {
+    document.body.classList.toggle('proj', view === 'projector');
+    document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === view));
+    document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-selected', String(t.dataset.view === view)));
+    $('phaseText').textContent = (S ? phaseNames[S.phase] : 'Not connected') + (LIVE ? '' : ' · Local demo');
+    if (view === 'student') renderStudent();
+    if (view === 'instructor') renderInstructor();
+    if (view === 'projector') {
+      if (!S) { $('projBody').innerHTML = `<h2>Bank Run</h2><p class="sub">${LIVE ? 'Add <b>&amp;code=XXXX</b> to this address, or open the projector from the instructor screen.' : 'Waiting for the session.'}</p>`; return; }
+      $('projBody').innerHTML = renderProjector();
+      const h = currentHist(); if (h && (S.phase === 'revealed' || S.phase === 'debrief')) wireChart(M.cleanSettings(h.settings), h.nPlayers);
+      if (S.phase === 'lobby') drawQR();
+    }
+  }
+  async function drawQR() {
+    const el = $('qr'); if (!el || !LIVE || !/^https?:/.test(location.protocol)) return;
+    if (!window.qrcode) await loadScript('https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js');
+    if (!window.qrcode || !$('qr')) return;
+    const q = window.qrcode(0, 'M'); q.addData(`${baseUrl}?code=${S.code}`); q.make();
+    $('qr').innerHTML = q.createSvgTag({ cellSize: 8, margin: 2, scalable: true }); const svg = $('qr').querySelector('svg'); if (svg) { svg.style.width = '100%'; svg.style.maxWidth = '380px'; svg.setAttribute('aria-label', 'QR code for the join link'); }
+  }
+  let refreshing = false;
+  async function refresh(force) {
+    if (refreshing) return; refreshing = true;
+    try {
+      if (code) {
+        S = await api.state(code, view === 'student' ? player : null);
+        if (view === 'student' && player && !S.me) { player = null; idStore.removeItem('bankrun-player'); }
+      } else S = null;
+    } catch (e) { if (view === 'student' && !player) S = null; }
+    refreshing = false;
+    const sig = JSON.stringify([S, view, player && player.id, host && host.code]);
+    if (force || sig !== lastSig) { lastSig = sig; render(); }
+  }
+  async function act(fn, msgId) {
+    const el = msgId && $(msgId);
+    try { await fn(); if (el && msgId !== 'receipt') el.textContent = ''; ping(); await refresh(true); }
+    catch (e) { await refresh(true); const again = msgId && $(msgId); if (again) { again.textContent = e.message; again.className = 'msg bad'; } }
+  }
+  function subscribe() {
+    if (!LIVE || !code || channel) return;
+    channel = sb.channel('bankrun-' + code).on('broadcast', { event: 'tick' }, () => setTimeout(refresh, Math.random() * 800)).subscribe();
+  }
+  const ping = () => { if (channel && view === 'instructor') channel.send({ type: 'broadcast', event: 'tick', payload: {} }); };
+
+  /* ---------- events ---------- */
+  const showTabs = !LIVE || view !== 'student';
+  if (showTabs) {
+    const list = LIVE ? ['instructor', 'projector'] : ['student', 'instructor', 'projector'];
+    $('tabs').innerHTML = list.map(v => `<button class="tab" data-view="${v}">${{ student: 'Student phone', instructor: 'Instructor', projector: 'Projector' }[v]}</button>`).join('');
+    $('tabs').classList.remove('hidden');
+    $('tabs').querySelectorAll('.tab').forEach(t => t.onclick = () => { view = t.dataset.view; refresh(true); });
+  }
+  $('preset').innerHTML = M.PRESETS.map((p, i) => `<option value="${p.id}">${i + 1}. ${p.label}</option>`).join('') + '<option value="custom">Custom</option>';
+  $('preset').onchange = () => fillForm($('preset').value);
+  fillForm(M.PRESETS[0].id);
+  [...fields, 'insurance', 'backstop'].forEach(f => $(f).addEventListener('input', () => { $('preset').value = 'custom'; $('presetNote').textContent = 'Custom settings. Edit the numbers below.'; }));
+  $('codeInput').value = code || '';
+  $('joinBtn').onclick = async () => {
+    const c = LIVE ? (params.get('code') || $('codeInput').value).trim().toUpperCase() : 'BANK', name = $('nameInput').value.trim();
+    if (LIVE && !c) { $('joinMsg').textContent = 'Enter the session code.'; return; }
+    if (!name) { $('joinMsg').textContent = 'Enter a display name.'; $('nameInput').focus(); return; }
+    try { const p = await api.join(c, name); code = c; player = { code: c, id: p.id, secret: p.secret, name }; idStore.setItem('bankrun-player', JSON.stringify(player)); $('joinMsg').textContent = ''; subscribe(); await refresh(true); }
+    catch (e) { $('joinMsg').textContent = e.message; }
+  };
+  $('nameInput').addEventListener('keydown', e => { if (e.key === 'Enter') $('joinBtn').click(); });
+  $('createBtn').onclick = async () => {
+    try { const r = await live.create($('hostKey').value); $('hostKey').value = ''; host = { code: r.code, hostSecret: r.hostSecret }; localStorage.setItem('bankrun-host', JSON.stringify(host)); code = r.code; subscribe(); await refresh(true); }
+    catch (e) { $('hostMsg').textContent = e.message; }
+  };
+  const hostDo = (action, payload) => act(async () => { await api.host(code, host.hostSecret, action, payload || {}); }, 'instMsg');
+  $('bSetup').onclick = () => hostDo('setup', { label: $('roundLabel').value.trim() || 'Round', settings: readForm() });
+  $('bOpen').onclick = () => hostDo('open'); $('bNext').onclick = () => hostDo(bankShut() ? 'close' : 'next'); $('bReveal').onclick = () => hostDo('reveal'); $('bDebrief').onclick = () => hostDo('debrief');
+  $('bSims').classList.toggle('hidden', LIVE);
+  $('bSims').onclick = () => { local.addSims(30); refresh(true); };
+  $('bExport').onclick = async () => {
+    try {
+      const rows = await api.exportRows(code, host.hostSecret), byRound = Object.fromEntries(S.history.map(h => [h.roundNo, h]));
+      const out = [['round', 'label', 'cash_pct', 'sale_price_pct', 'bad_loans_pct', 'insurance', 'insurance_limit', 'lender_of_last_resort', 'need_cash_pct', 'windows', 'depositors', 'needed_cash', 'withdrew', 'ran', 'bank_outcome', 'lost_to_run', 'display_name', 'needed_cash_today', 'withdrew_in_window', 'guess_pct', 'payout']];
+      for (const x of rows) { const h = byRound[x.roundNo]; if (!h) continue; const r = resultOf(h), s = r.settings, c = costOf(h, r);
+        out.push([h.roundNo, h.label, s.cashPct, s.salePricePct, s.lossPct, s.insurance, s.insuranceLimit, s.backstop, s.needPct, s.windows, r.n, h.nNeed, r.w + r.late, c.ran, r.status, c.destroyed.toFixed(2), x.name, !!x.need, x.window ?? '', x.guess ?? '', (M.payoutFor(r, x.window) ?? 0).toFixed(2)]); }
+      const csv = out.map(row => row.map(v => `"${String(v).replaceAll('"', '""')}"`).join(',')).join('\r\n');
+      const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = `bank-run-${S.code}.csv`; a.click(); URL.revokeObjectURL(a.href);
+    } catch (e) { $('instMsg').textContent = e.message; }
+  };
+  $('bReset').textContent = LIVE ? 'Leave this session' : 'Reset demo';
+  $('bReset').onclick = () => {
+    if (!confirm(LIVE ? 'Leave this session on this device? You will not be able to control it again. Export the CSV first if you need it.' : 'Clear this browser’s local demo session and start over?')) return;
+    if (LIVE) { localStorage.removeItem('bankrun-host'); host = null; code = ''; if (channel) { sb.removeChannel(channel); channel = null; } }
+    else { local.reset(); sessionStorage.removeItem('bankrun-player'); player = null; }
+    $('preset').value = M.PRESETS[0].id; fillForm(M.PRESETS[0].id); refresh(true);
+  };
+  $('modeNote').textContent = LIVE ? 'Live session. Only display names are stored. Instructor controls work only from the browser that created the session.' : 'Local demo: names and choices stay in this browser. Open this page in more tabs to play several students. Fill in config.js to play on phones.';
+  $('footer').textContent = liveError || (LIVE ? 'Only your display name is stored · the payout rule is in SPEC.md' : 'Local demonstration · nothing is sent to a server · the payout rule is in SPEC.md');
+
+  window.addEventListener('storage', e => { if (e.key === LKEY) refresh(); });
+  subscribe();
+  await refresh(true);
+  setInterval(refresh, LIVE ? (view === 'student' ? 3000 : 2000) : 1500);
+})();
+</script>
+</body>
+</html>

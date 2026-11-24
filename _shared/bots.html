@@ -16,6 +16,11 @@
         <div class="field"><label for="app">Game</label><select id="app">
           <option value="inflation-auction">Inflation Auction</option>
           <option value="barter-market">Barter Market</option>
+          <option value="class-check">Class Check</option>
+          <option value="multiplier-game">Money Multiplier</option>
+          <option value="lemons-market">Lemons Market</option>
+          <option value="bond-showdown">Bond Showdown</option>
+          <option value="bank-run">Bank Run</option>
         </select></div>
         <div class="field" style="max-width:130px"><label for="code">Session code</label><input id="code" maxlength="4" autocapitalize="characters" placeholder="ABCD"></div>
         <div class="field" style="max-width:110px"><label for="n">Students</label><input id="n" type="number" min="1" max="150" value="40"></div>
@@ -46,7 +51,7 @@
     const app = $('app').value, code = $('code').value.trim().toUpperCase(), n = Math.max(1, Math.min(150, Number($('n').value) || 1));
     if (!code) { $('msg').textContent = 'Enter the session code.'; return; }
     if (!window.CLASSROOM_GAME) {
-      const deps = { 'inflation-auction': ['model.js', 'game.js'], 'barter-market': ['game.js'] }[app] || ['game.js'];
+      const deps = { 'inflation-auction': ['model.js', 'game.js'], 'barter-market': ['game.js'], 'class-check': ['sets.js', 'game.js'], 'bank-run': ['model.js', 'game.js'] }[app] || ['game.js'];
       for (const f of deps) if (!await loadScript(`../${app}/${f}`)) { $('msg').textContent = `Could not load ../${app}/${f}.`; return; }
     }
     const game = window.CLASSROOM_GAME;

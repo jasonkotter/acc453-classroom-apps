@@ -47,7 +47,7 @@
     }).join('')}</div>${unit ? `<p class="note" style="margin:0">${unit}</p>` : ''}`;
   };
   /* Line chart. series: [{points: [[x, y]], color, dash?, label, dots?}] */
-  ui.lines = (series, { xLabel = '', yLabel = '', xFmt = x => x, yFmt = y => y, yMin = 0, yMax, xMin, xMax, aria = 'Line chart', vline } = {}) => {
+  ui.lines = (series, { xLabel = '', yLabel = '', xFmt = x => x, yFmt = y => y, yMin = 0, yMax, xMin, xMax, aria = 'Line chart', vline, xTicks } = {}) => {
     const W = 720, H = 260, L = 58, R = 18, T = 14, B = 44, pw = W - L - R, ph = H - T - B;
     const all = series.flatMap(s => s.points);
     if (!all.length) return '<p class="note">No data yet.</p>';
@@ -55,7 +55,7 @@
     const y1 = yMax ?? Math.max(...all.map(p => p[1]), yMin + 1) * 1.08;
     const X = x => L + (x - x0) / (x1 - x0 || 1) * pw, Y = y => T + ph - (y - yMin) / (y1 - yMin || 1) * ph;
     const yt = [0, .25, .5, .75, 1].map(f => yMin + f * (y1 - yMin));
-    const xt = [0, .25, .5, .75, 1].map(f => x0 + f * (x1 - x0));
+    const xt = xTicks || [0, .25, .5, .75, 1].map(f => x0 + f * (x1 - x0));
     return `<div class="chart"><div class="legend" style="margin-bottom:4px">${series.filter(s => s.label).map(s => `<span><svg width="30" height="10" aria-hidden="true"><line x1="0" x2="30" y1="5" y2="5" stroke="${s.color}" stroke-width="3" ${s.dash ? 'stroke-dasharray="6 4"' : ''}/></svg>${s.label}</span>`).join('')}</div>
       <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${ui.esc(aria)}">
       ${yt.map(v => `<line x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}" stroke="#e3e8e5"/><text x="${L - 8}" y="${Y(v) + 4}" text-anchor="end" font-size="14" fill="#5d6e73">${yFmt(v)}</text>`).join('')}
@@ -249,7 +249,7 @@
       $('instCounts').textContent = `${S.nJoined} joined` + (S.roundNo ? ` · ${S.nPlayers} in this round` : '') + (S.phase === 'open' ? ` · ${S.nMoved} answered this step` : '') + (S.phase === 'instructions' && S.nPlayers < 1 ? ' · needs at least one student before opening' : '');
       $('instCode').textContent = S.code; $('instJoin').textContent = LIVE ? `${baseUrl}?code=${S.code}` : baseUrl;
       $('projLink').href = `${baseUrl}?view=projector${LIVE ? '&code=' + S.code : params.has('demo') ? '&demo=1' : ''}`;
-      $('instResult').innerHTML = game.renderInstructor ? game.renderInstructor(S, ctxFor()) || '' : '';
+      preserve($('instResult'), () => { $('instResult').innerHTML = game.renderInstructor ? game.renderInstructor(S, ctxFor()) || '' : ''; });
     }
     async function hostAct(fn) {
       if (busy) return; busy = true; $('instMsg').textContent = '';
