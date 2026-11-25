@@ -151,4 +151,45 @@ window.CLASS_CHECK_SETS = [
       { type: 'number', prompt: '<b>Real GDP growth</b> in the most recent quarter, at an annual rate.', unit: '%', min: -40, max: 40, step: 0.1, answer: null, explain: 'Quarterly growth is reported at an annual rate, so it swings more than you might expect.' }
     ]
   }
+  ,{
+    id: 'curve-shifts', title: 'Which Curve Shifts?', revote: true,
+    note: 'Feb 25, after 08.4–08.5. Six one-force scenarios in the bond-market model (supply = borrowers, demand = lenders; flip price into yield). About 8 minutes.',
+    questions: [
+      ['Stocks suddenly become much <b>riskier</b>: volatility doubles and stays high. What happens in the <b>Treasury</b> market?', 'a',
+        'Relative risk: bonds now look safer than the alternative, so lenders want more of them at every price. Demand shifts right, the price rises, and the yield falls.'],
+      ['Congress <b>cuts taxes</b> and leaves spending unchanged. What happens in the <b>Treasury</b> market?', 'c',
+        'Net government financing: a bigger deficit has to be borrowed, so the Treasury sells more bonds. Supply shifts right, the price falls, and the yield rises.'],
+      ['New data convince markets that <b>inflation will run higher</b> for the next decade. What happens in the <b>Treasury</b> market?', 'e',
+        'Expected inflation moves both curves: lenders want fewer fixed-dollar bonds (demand left) and borrowers want to borrow now (supply right). Both push the price down, so the yield rises.'],
+      ['Companies see <b>more good projects</b> to fund as the economy strengthens. What happens in the <b>corporate</b> bond market?', 'c',
+        'Economic conditions shift supply, not demand: firms borrow when they have projects worth funding. Supply shifts right, the price falls, and the yield rises.'],
+      ['Bond trading gets <b>cheaper and faster</b>: bid-ask spreads narrow sharply. What happens in the <b>corporate</b> bond market?', 'a',
+        'Market liquidity: bonds that are easier to sell at a fair price are worth more to lenders. Demand shifts right, the price rises, and the yield falls.'],
+      ['An <b>AI boom</b> raises expected stock returns well above normal. What happens in the <b>Treasury</b> market?', 'b',
+        'Relative return: bonds look worse next to stocks, so lenders want fewer of them at every price. Demand shifts left, the price falls, and the yield rises.']
+    ].map(([prompt, answer, explain]) => ({ prompt, answer, explain, options: [
+      { id: 'a', text: 'Demand shifts right; interest rates fall', why: 'Demand is lenders. More demand raises the price, and a higher price means a lower yield.' },
+      { id: 'b', text: 'Demand shifts left; interest rates rise', why: 'Ask whether lenders really want fewer bonds at every price here, or whether the force works on borrowers.' },
+      { id: 'c', text: 'Supply shifts right; interest rates rise', why: 'Supply is borrowers. More borrowing lowers the price, and a lower price means a higher yield.' },
+      { id: 'd', text: 'Supply shifts left; interest rates fall', why: 'That would need borrowers to want less. Check whether this force works on borrowers at all, and in which direction.' },
+      { id: 'e', text: 'Both curves shift; interest rates rise', why: 'Only expected inflation moves both curves. Every other force works on one side of the market.' }
+    ] }))
+  }
+  ,{
+    id: 'who-wins', title: 'Who Wins From Inflation?', revote: true,
+    note: 'Apr 13, with 14.7 and the Who Gained case. Seven holders; inflation turns out 5 points higher than everyone expected. About 8 minutes; skip the case\'s inflation-only points if this runs first.',
+    questions: [
+      ['A household with a <b>30-year fixed-rate mortgage</b>.', 'a', 'The payments are fixed in dollars, so higher-than-expected inflation shrinks the real value of the debt. Borrowers with fixed-rate debt gain.'],
+      ['A retiree whose savings sit in a <b>bank CD at a fixed rate</b>.', 'b', 'The CD pays fixed dollars that now buy less. Holders of fixed-dollar assets lose: inflation transfers from them to fixed-dollar borrowers.'],
+      ['A retiree living on <b>Social Security</b>, which is raised each year with the CPI.', 'c', 'The cost-of-living adjustment keeps benefits roughly in step with prices, with a lag of up to a year, so the retiree is largely protected.'],
+      ['The <b>federal government</b>, which owes trillions of dollars of fixed-rate debt.', 'a', 'Like any fixed-rate borrower, it repays in dollars worth less. This is part of the inflation tax (Ch. 2).'],
+      ['A <b>bank</b> holding fixed-rate mortgages, funded by deposits whose rates rise with market rates.', 'b', 'Its assets pay fixed dollars while its funding costs rise, and the mortgages lose market value as rates go up. This is the interest rate risk of Ch. 9 and SVB.'],
+      ['An investor holding <b>TIPS</b>, Treasury bonds whose principal rises with the CPI.', 'c', 'TIPS are indexed to inflation, so their real value is protected. That is what the inflation adjustment buys.'],
+      ['A worker whose <b>wage is fixed</b> for the next two years.', 'b', 'The wage is a fixed-dollar income, so its purchasing power falls until it can be renegotiated.']
+    ].map(([who, answer, explain]) => ({ prompt: `Over the next two years, inflation turns out <b>5 points higher</b> than everyone expected. ${who} Does inflation make them better or worse off in real terms?`, answer, explain, options: [
+      { id: 'a', text: 'Better off', why: 'Gains go to those who owe fixed dollars: their real debt shrinks.' },
+      { id: 'b', text: 'Worse off', why: 'Losses fall on those owed fixed dollars, or paid in them: what they receive buys less.' },
+      { id: 'c', text: 'Roughly protected', why: 'Protection comes from payments that rise with prices, such as an index or a cost-of-living adjustment.' }
+    ] }))
+  }
 ];

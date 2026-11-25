@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Create sessions · ACC 453</title>
+  <link rel="stylesheet" href="classroom.css">
+</head>
+<body>
+  <header class="top"><div class="brand">Money &amp; Banking · Classroom</div><div class="course">Instructor tool</div></header>
+  <main class="shell">
+    <section class="hero"><div><div class="eyebrow">Several apps at once</div><h1>Create sessions</h1>
+      <p>Enter the instructor passphrase once to create a live session for each app you tick. Each app's instructor page in this browser then opens on its new session, as if you had created it there. The passphrase is sent once per session and is not saved.</p></div></section>
+    <div class="card" style="max-width:820px">
+      <div id="apps" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:6px 14px;margin-bottom:14px"></div>
+      <label class="check"><input type="checkbox" id="replace"> Replace a session this browser already runs for that app</label>
+      <div class="row" style="margin-top:10px"><div class="field"><label for="hostKey">Instructor passphrase</label><input id="hostKey" type="password" autocomplete="off"></div>
+        <button class="btn primary" id="go">Create sessions</button></div>
+      <p class="msg" id="msg"></p>
+      <div id="out"></div>
+    </div>
+  </main>
+<script src="config.js"></script>
+<script>window.CLASSROOM_NO_START = true;</script>
+<script src="local.js"></script>
+<script src="classroom.js"></script>
+<script>
+(async () => {
+  /* folder, game id (as in each game.js), title */
+  const APPS = [
+    ['inflation-auction', 'auction', 'Inflation Auction'], ['barter-market', 'barter', 'Barter Market'], ['class-check', 'class-check', 'Class Check'],
+    ['payment-gridlock', 'gridlock', 'Payment Gridlock'], ['multiplier-game', 'multiplier', 'Money Multiplier'], ['lemons-market', 'lemons', 'Lemons Market'],
+    ['hidden-effort', 'hidden-effort', 'Hidden Effort'], ['loan-officer', 'loanofficer', 'Loan Officer'], ['bond-showdown', 'bonds', 'Bond Showdown'],
+    ['fire-sale', 'firesale', 'Fire Sale'], ['bank-run', 'bank-run', 'Bank Run'], ['info-market', 'infomarket', 'Information Market'],
+    ['fed-funds-market', 'fed-funds', 'Fed Funds Market'], ['defend-the-peg', 'peg', 'Defend the Peg'], ['credibility', 'credibility', 'Can the Central Bank Be Believed?']];
+  const $ = id => document.getElementById(id), esc = window.Classroom.ui.esc, params = new URLSearchParams(location.search);
+  const want = (params.get('apps') || '').split(',').filter(Boolean);
+  const held = id => { try { return JSON.parse(localStorage.getItem(`cls-host-${id}`) || 'null'); } catch { return null; } };
+  $('apps').innerHTML = APPS.map(([f, id, t]) => { const h = held(id);
+    return `<label class="check"><input type="checkbox" data-f="${f}" data-id="${id}" ${want.includes(f) ? 'checked' : ''}> ${esc(t)}${h ? ` <small class="note">(has ${esc(h.code)})</small>` : ''}</label>`; }).join('');
+  const conn = await window.Classroom.connect('sessions', false);
+  if (!conn.live) { $('msg').textContent = 'No Supabase configuration in config.js, so there is nothing to create.'; $('msg').className = 'msg bad'; $('go').disabled = true; return; }
+  $('go').onclick = async () => {
+    const key = $('hostKey').value, picks = [...document.querySelectorAll('#apps input:checked')];
+    if (!key) { $('msg').textContent = 'Enter the passphrase.'; return; }
+    if (!picks.length) { $('msg').textContent = 'Tick at least one app.'; return; }
+    $('go').disabled = true; const rows = [];
+    for (const cb of picks) {
+      const f = cb.dataset.f, id = cb.dataset.id, old = held(id);
+      if (old && !$('replace').checked) { rows.push([f, old.code, 'kept the existing session']); continue; }
+      try { const r = await conn.api.create(key, id); localStorage.setItem(`cls-host-${id}`, JSON.stringify({ code: r.code, hostSecret: r.hostSecret })); rows.push([f, r.code, 'created']); }
+      catch (e) { rows.push([f, '—', esc(e.message)]); if (/passphrase/i.test(e.message)) break; }
+    }
+    $('hostKey').value = ''; $('go').disabled = false;
+    $('msg').textContent = `${rows.filter(r => r[2] === 'created').length} created.`;
+    $('out').innerHTML = window.Classroom.ui.table(['App', 'Code', 'Result', ''], rows.map(([f, c, res]) => [esc(f), `<b>${esc(c)}</b>`, res,
+      c !== '—' ? `<a href="../${f}/">Instructor</a> · <a href="bots.html?app=${f}&code=${c}">Bots</a>` : '']));
+  };
+})();
+</script>
+</body>
+</html>

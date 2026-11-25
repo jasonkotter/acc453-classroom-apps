@@ -18,7 +18,7 @@
   ];
   const presets = SETS.map(s => ({ id: s.id, label: s.title, note: s.note || '', values: { set: s.id, revote: s.revote !== false } }));
   function strip(q) {
-    const o = { type: q.type || 'choice', prompt: q.prompt, show: q.show || null, unit: q.unit || '', min: q.min, max: q.max, step: q.step };
+    const o = { type: q.type || 'choice', prompt: q.prompt, show: q.show || null, lines: q.lines || null, unit: q.type === 'prob' ? '%' : (q.unit || ''), min: q.min, max: q.max, step: q.step };
     if (o.type === 'choice') o.options = q.options.map(x => ({ id: x.id, text: x.text }));
     return o;
   }
@@ -56,6 +56,7 @@
       const src = (findSet(s.set) || {}).questions[q] || {};
       const key = { explain: src.explain || '', fixed: src.fixed || null };
       if (Q.type === 'choice') { key.answer = src.answer; key.why = Object.fromEntries(src.options.map(o => [o.id, o.why || ''])); }
+      else if (Q.type === 'prob') { key.answer = src.answer === true ? 100 : src.answer === false ? 0 : pendingActual; key.outcome = src.outcome || ''; }
       else key.answer = Number.isFinite(src.answer) ? src.answer : pendingActual;
       pub['key' + q] = key; pendingActual = null;
     }
@@ -66,7 +67,7 @@
   function controls(S, list, h) {
     if (S.phase !== 'open' || S.pending) return list;
     const { q, k } = at(S.step), s = S.settings, Q = s.questions[q], last = q === s.questions.length - 1;
-    const needActual = Q.type !== 'choice' && !Number.isFinite(((findSet(s.set) || {}).questions[q] || {}).answer);
+    const srcA = ((findSet(s.set) || {}).questions[q] || {}).answer, needActual = Q.type !== 'choice' && !Number.isFinite(srcA) && typeof srcA !== 'boolean';
     const readActual = () => { if (!needActual) return true; const v = Number((document.getElementById('ccActual') || {}).value); if (!Number.isFinite(v) || document.getElementById('ccActual').value === '') { document.getElementById('instMsg').textContent = 'Enter the actual value first.'; return false; } pendingActual = v; return true; };
     const keep = list.filter(b => ['close', 'reveal', 'debrief'].includes(b.id)).map(b => Object.assign(b, { next: b.id === 'close' && k === 'review' && last }));
     const own = [];
@@ -85,6 +86,10 @@
     const line = l => `<p style="${l.opt && l.opt === wrong ? 'background:var(--rose);border-radius:6px;padding:0 4px;text-decoration:line-through' : ''}"><span>${l.opt ? `<b>(${l.opt.toUpperCase()})</b> ` : ''}${esc(l.label)}</span><span>${esc(l.amount)}</span></p>`;
     return `<div class="tgrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px">${show.map(t => `<div><div class="label" style="margin-top:6px">${esc(t.who)}</div><div class="taccount"><div><h4>Assets</h4>${(t.assets || []).map(line).join('') || '<p class="note">—</p>'}</div><div><h4>Liabilities</h4>${(t.liabilities || []).map(line).join('') || '<p class="note">—</p>'}</div></div></div>`).join('')}</div>`;
   }
+  function figure(Q) {
+    const f = Q.lines; if (!f) return '';
+    return ui.lines(f.series, { xLabel: f.xLabel || '', yLabel: f.yLabel || '', yMin: f.yMin ?? 0, yMax: f.yMax, xMin: f.xMin, xMax: f.xMax, xTicks: f.xTicks, yTicks: f.yTicks, xFmt: x => Math.round(x), yFmt: y => y.toFixed(1), aria: f.aria || 'Chart' });
+  }
   function optionBars(Q, split1, split2, key) {
     const fin = split2 || split1, wrong = key && fin ? Q.options.filter(o => o.id !== key.answer).sort((x, y) => fin.counts[y.id] - fin.counts[x.id])[0] : null;
     const showWhy = id => key && (id === key.answer || (wrong && id === wrong.id && fin.counts[id] > 0));
@@ -99,6 +104,13 @@
   }
   function numberSummary(Q, split, key) {
     if (!split || !split.n) return '<p class="note">No answers.</p>';
+    if (Q.type === 'prob') {
+      const bins = Array.from({ length: 10 }, (_, i) => ({ n: 0, i })), a = key && Number.isFinite(key.answer) ? key.answer : null;
+      for (const v of split.vals) bins[Math.min(9, Math.floor(v / 10))].n++;
+      const brier = a == null ? null : ui.mean(split.vals.map(v => Math.pow(v / 100 - a / 100, 2)));
+      return ui.bars(bins.map(b => ({ label: `${b.i * 10}–${b.i * 10 + 10}%`, parts: [{ n: b.n, color: a == null ? '#b7c6c2' : (a === 100 ? b.i >= 5 : b.i < 5) ? 'var(--teal)' : '#b7c6c2' }] })), { aria: 'Distribution of the class probabilities' }) +
+        ui.tiles([['Class average', Math.round(ui.mean(split.vals)) + '%'], ['Answers', split.n], ...(brier != null ? [['Class Brier score', brier.toFixed(2), 'hi']] : [])], 'three');
+    }
     const vals = split.vals, lo = Math.min(...vals, key && Number.isFinite(key.answer) ? key.answer : Infinity), hi = Math.max(...vals, key && Number.isFinite(key.answer) ? key.answer : -Infinity);
     const nb = 12, w = (hi - lo) / nb || 1, bins = Array.from({ length: nb }, (_, i) => ({ lo: lo + i * w, n: 0 }));
     for (const v of vals) bins[Math.min(nb - 1, Math.floor((v - lo) / w))].n++;
@@ -117,11 +129,12 @@
       if (S.pending) return `${head}<h2>Counting…</h2>`;
       const { q, k } = at(S.step), Q = s.questions[q], key = S.pub['key' + q], base = 3 * q + 1;
       const s1 = S.pub['split' + base], s2 = S.pub['split' + (base + 1)];
-      const top = `${head}<h2 style="font-size:1.6rem">Question ${q + 1} of ${s.questions.length}</h2><p style="font-size:1.25rem;margin:4px 0 8px">${Q.prompt}</p>${taccounts(Q.show, k === 'review' ? key : null, Q)}`;
+      const top = `${head}<h2 style="font-size:1.6rem">Question ${q + 1} of ${s.questions.length}</h2><p style="font-size:1.25rem;margin:4px 0 8px">${Q.prompt}</p>${taccounts(Q.show, k === 'review' ? key : null, Q)}`, fig = figure(Q);
       const status = k === 'review' ? '' : `<div class="banner ${k === 'revote' ? 'warn' : ''}"><strong style="font-size:1.2em">${k === 'revote' ? 'Convince your neighbor, then answer again.' : 'Answer on your phone.'}</strong>${S.nMoved} of ${S.nPlayers} answered${k === 'revote' ? ' this time' : ''}.</div>`;
-      if (Q.type === 'choice') return top + status + optionBars(Q, k === 'vote' ? null : s1, k === 'review' && s2 && s2.n ? s2 : null, k === 'review' ? key : null) + (k === 'review' ? `<div class="split" style="align-items:start">${key.explain ? `<div class="banner" style="margin:8px 0"><strong>Why</strong>${key.explain}</div>` : '<div></div>'}<div>${key.fixed ? `<div class="label">The correct entries</div>${taccounts(key.fixed, null, Q)}` : ''}</div></div>` : '');
+      if (Q.type === 'choice') return top + fig + status + optionBars(Q, k === 'vote' ? null : s1, k === 'review' && s2 && s2.n ? s2 : null, k === 'review' ? key : null) + (k === 'review' ? `<div class="split" style="align-items:start">${key.explain ? `<div class="banner" style="margin:8px 0"><strong>Why</strong>${key.explain}</div>` : '<div></div>'}<div>${key.fixed ? `<div class="label">The correct entries</div>${taccounts(key.fixed, null, Q)}` : ''}</div></div>` : '');
       const sp = k === 'review' ? (s2 && s2.n ? s2 : s1) : k === 'revote' ? s1 : null;
-      return top + status + (sp ? numberSummary(Q, sp, k === 'review' ? key : null) : '') + (k === 'review' && key.explain ? `<div class="banner"><strong>Why</strong>${key.explain}</div>` : '');
+      const side = (k === 'review' && Q.type === 'prob' ? `<div class="banner" style="margin:6px 0"><strong style="font-size:1.2em">${key.outcome || (key.answer === 100 ? 'It happened.' : 'It did not happen.')}</strong></div>` : '') + (sp ? numberSummary(Q, sp, k === 'review' ? key : null) : '') + (k === 'review' && key.explain ? `<div class="banner"><strong>Why</strong>${key.explain}</div>` : '');
+      return top + (fig ? `<div style="display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:18px;align-items:start"><div>${fig}</div><div>${status}${side}</div></div>` : status + side);
     }
     if (S.phase === 'closed') return `${head}<h2>That's the set</h2><p class="sub">Results in a moment.</p>`;
     const h = S.history.find(x => x.roundNo === S.roundNo); if (!h) return head;
@@ -129,7 +142,7 @@
   }
   function summaryTable(h) {
     return ui.table(['Question', 'First answer right', 'Final answer right', 'Answers'], h.result.perQ.map((r, i) => [`${i + 1}. ${h.settings.questions[i].prompt.replace(/<[^>]+>/g, '').slice(0, 70)}…`,
-      r.first != null ? ui.pct(r.first) : (r.err1 != null ? 'median miss ' + ui.num(r.err1, 1) : '—'), r.final != null ? `<b>${ui.pct(r.final)}</b>` : (r.err2 != null ? 'median miss ' + ui.num(r.err2, 1) : '—'), r.n]));
+      r.first != null ? ui.pct(r.first) : r.brier1 != null ? 'Brier ' + r.brier1.toFixed(2) : (r.err1 != null ? 'median miss ' + ui.num(r.err1, 1) : '—'), r.final != null ? `<b>${ui.pct(r.final)}</b>` : r.brier2 != null ? `<b>Brier ${r.brier2.toFixed(2)}</b>` : (r.err2 != null ? 'median miss ' + ui.num(r.err2, 1) : '—'), r.n])) + (h.result.perQ.some(r => r.brier2 != null) ? '<p class="note">Brier score: the average squared gap between the probability and what happened (1 if it did, 0 if not). 0 is perfect; always saying 50% scores 0.25.</p>' : '');
   }
 
   /* ---------- student ---------- */
@@ -139,11 +152,12 @@
     if (S.phase === 'open') {
       if (S.pending) return '<h2>Counting…</h2>';
       const { q, k } = at(S.step), Q = s.questions[q], mine = me.moves[String(S.step)], key = S.pub['key' + q];
-      const head = `<div class="label">Question ${q + 1} of ${s.questions.length}${k === 'revote' ? ' · answer again' : ''}</div><p style="font-size:1.08rem;font-weight:650">${Q.prompt}</p>${taccounts(Q.show, k === 'review' ? key : null, Q)}`;
+      const head = `<div class="label">Question ${q + 1} of ${s.questions.length}${k === 'revote' ? ' · answer again' : ''}</div><p style="font-size:1.08rem;font-weight:650">${Q.prompt}</p>${taccounts(Q.show, k === 'review' ? key : null, Q)}${figure(Q)}`;
       if (k === 'review') {
         const fin = me.moves[String(3 * q + 2)] || me.moves[String(3 * q + 1)];
         if (Q.type === 'choice') { const right = fin && fin.choice === key.answer; return head + `<div class="banner ${fin ? (right ? '' : 'bad') : 'warn'}"><strong>${fin ? (right ? '✔ Right' : `✖ The answer is ${key.answer.toUpperCase()}`) : `The answer is ${key.answer.toUpperCase()}`}</strong>${fin && !right && key.why[fin.choice] ? key.why[fin.choice] : ''}</div>${key.explain ? `<p class="sub">${key.explain}</p>` : ''}`; }
         const v = fin ? (Q.type === 'prob' ? fin.p : fin.value) : null;
+        if (Q.type === 'prob') return head + `<div class="banner"><strong>${key.outcome || (key.answer === 100 ? 'It happened.' : 'It did not happen.')}</strong>${v != null ? `You said ${Math.round(v)}%.` : ''}</div>${key.explain ? `<p class="sub">${key.explain}</p>` : ''}`;
         return head + `<div class="banner"><strong>Actual: ${Number.isFinite(key.answer) ? ui.num(key.answer, 1) + (Q.unit === '%' ? '%' : '') : '—'}</strong>${v != null ? `You said ${ui.num(v, 1)}${Q.unit === '%' ? '%' : ''}.` : ''}</div>${key.explain ? `<p class="sub">${key.explain}</p>` : ''}`;
       }
       if (Q.type === 'choice') return head + `<div style="display:grid;gap:8px">${Q.options.map(o => `<button class="choice" data-choice="${o.id}" aria-pressed="${!!mine && mine.choice === o.id}"><b>${o.id.toUpperCase()}.</b> <span style="display:inline;color:var(--ink)">${o.text}</span></button>`).join('')}</div><p class="msg good" id="receipt">${mine ? 'Answer in. You can change it until the instructor moves on.' : ''}</p>`;
@@ -167,7 +181,8 @@
     if (S.phase !== 'open' || S.pending) return '';
     const { q, k } = at(S.step), Q = S.settings.questions[q], src = ((findSet(S.settings.set) || {}).questions || [])[q] || {};
     let html = `<div class="banner"><strong>Question ${q + 1} · ${k}</strong>${S.nMoved} of ${S.nPlayers} answered</div>`;
-    if (k !== 'review') html += Q.type === 'choice' ? `<p class="note">Answer: <b>${String(src.answer).toUpperCase()}</b> (private to you)</p>` : Number.isFinite(src.answer) ? `<p class="note">Answer: <b>${src.answer}</b></p>` : `<div class="field"><label for="ccActual">Actual value, to reveal${Q.unit ? ` (${esc(Q.unit)})` : ''}</label><input id="ccActual" type="number" step="any"></div>`;
+    if (k !== 'review' && typeof src.answer === 'boolean') html += `<p class="note">Answer: <b>${src.answer ? 'it happened' : 'it did not happen'}</b> (private to you)</p>`;
+    else if (k !== 'review') html += Q.type === 'choice' ? `<p class="note">Answer: <b>${String(src.answer).toUpperCase()}</b> (private to you)</p>` : Number.isFinite(src.answer) ? `<p class="note">Answer: <b>${src.answer}</b></p>` : `<div class="field"><label for="ccActual">Actual value, to reveal${Q.unit ? ` (${esc(Q.unit)})` : ''}</label><input id="ccActual" type="number" step="any"></div>`;
     return html;
   }
 
@@ -182,6 +197,10 @@
         const a1 = Object.values(v1), af = ids.map(fin).filter(Boolean);
         ids.forEach(id => { priv[id].of++; if (fin(id) && fin(id).choice === key.answer) priv[id].score++; });
         return { n: af.length, first: a1.length ? a1.filter(m => m.choice === key.answer).length / a1.length : null, final: af.length ? af.filter(m => m.choice === key.answer).length / af.length : null };
+      }
+      if (Q.type === 'prob') {
+        const br = arr => Number.isFinite(key.answer) && arr.length ? ui.mean(arr.map(m => Math.pow(m.p / 100 - key.answer / 100, 2))) : null;
+        return { n: ids.map(fin).filter(Boolean).length, brier1: br(Object.values(v1)), brier2: br(ids.map(fin).filter(Boolean)) };
       }
       const val = m => Q.type === 'prob' ? m.p : m.value;
       const err = arr => Number.isFinite(key.answer) && arr.length ? ui.median(arr.map(m => Math.abs(val(m) - key.answer))) : null;

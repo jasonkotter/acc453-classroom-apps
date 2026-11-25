@@ -30,6 +30,6 @@ students will be noisier; what matters is the direction.
 **Debrief.** Which cars stopped selling, and why? What did inspection change, and who paid for
 it? Where do you see inspection, warranties, or reputation doing this job (CarFax, certified
 pre-owned, credit scores)? How does a bank face the same problem with borrowers (06.3)? The
-moral-hazard lending round follows as a separate activity.
+moral-hazard lending round follows as a separate activity: [Hidden Effort](../hidden-effort/README.md).
 
 **Fallback.** Cards with a quality for sellers; buyers write offers on slips; tally on the board.

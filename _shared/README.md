@@ -11,6 +11,8 @@ Every multiplayer app runs on these files. Design and decisions: `../../APP_BUIL
 | `local.js` | The local demo backend, the same rules as `schema.sql` kept in localStorage. Keep the two in step. |
 | `classroom.css` | Shared styles, including the projector mode. |
 | `bots.html` | Joins simulated students to a live session for a classroom-scale rehearsal. |
+| `sessions.html` | Creates live sessions for several apps with one passphrase entry (`?apps=folder,folder` pre-ticks them); each app's instructor page in that browser then opens on its session. |
+| `rehearse.js` | Rehearsal driver, loaded from the console on a live instructor page: `(await import('../_shared/rehearse.js')).default.run(null, 12)` joins 12 simulated students and clicks the instructor's own controls through every preset, logging each round's result in `Rehearse.log`. `opts.pick` handles games with custom controls (Class Check). |
 
 ## Adding a game
 
@@ -21,7 +23,7 @@ Every multiplayer app runs on these files. Design and decisions: `../../APP_BUIL
    so the bot runner can load it without drawing the page.
 3. Answer rules go in `settings.input` (see `cls_check` in `schema.sql`): the server rejects
    anything else. Private per-student data comes from `assign`; results from `resolve`.
-4. Add the game to the menu in `bots.html` and to the landing page.
+4. Add the game to the menu in `bots.html`, to the list in `sessions.html`, and to the landing page.
 5. Bump the `?v=` version on the script tags when publishing changes, so phones do not run a
    cached copy.
 

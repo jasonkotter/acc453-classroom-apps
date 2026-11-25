@@ -47,18 +47,18 @@
     }).join('')}</div>${unit ? `<p class="note" style="margin:0">${unit}</p>` : ''}`;
   };
   /* Line chart. series: [{points: [[x, y]], color, dash?, label, dots?}] */
-  ui.lines = (series, { xLabel = '', yLabel = '', xFmt = x => x, yFmt = y => y, yMin = 0, yMax, xMin, xMax, aria = 'Line chart', vline, xTicks } = {}) => {
+  ui.lines = (series, { xLabel = '', yLabel = '', xFmt = x => x, yFmt = y => y, yMin = 0, yMax, xMin, xMax, aria = 'Line chart', vline, xTicks, yTicks } = {}) => {
     const W = 720, H = 260, L = 58, R = 18, T = 14, B = 44, pw = W - L - R, ph = H - T - B;
     const all = series.flatMap(s => s.points);
     if (!all.length) return '<p class="note">No data yet.</p>';
     const x0 = xMin ?? Math.min(...all.map(p => p[0])), x1 = xMax ?? Math.max(...all.map(p => p[0]), x0 + 1);
     const y1 = yMax ?? Math.max(...all.map(p => p[1]), yMin + 1) * 1.08;
     const X = x => L + (x - x0) / (x1 - x0 || 1) * pw, Y = y => T + ph - (y - yMin) / (y1 - yMin || 1) * ph;
-    const yt = [0, .25, .5, .75, 1].map(f => yMin + f * (y1 - yMin));
+    const yt = yTicks || [0, .25, .5, .75, 1].map(f => yMin + f * (y1 - yMin));
     const xt = xTicks || [0, .25, .5, .75, 1].map(f => x0 + f * (x1 - x0));
     return `<div class="chart"><div class="legend" style="margin-bottom:4px">${series.filter(s => s.label).map(s => `<span><svg width="30" height="10" aria-hidden="true"><line x1="0" x2="30" y1="5" y2="5" stroke="${s.color}" stroke-width="3" ${s.dash ? 'stroke-dasharray="6 4"' : ''}/></svg>${s.label}</span>`).join('')}</div>
       <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${ui.esc(aria)}">
-      ${yt.map(v => `<line x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}" stroke="#e3e8e5"/><text x="${L - 8}" y="${Y(v) + 4}" text-anchor="end" font-size="14" fill="#5d6e73">${yFmt(v)}</text>`).join('')}
+      ${yt.map(v => `<line x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}" stroke="${Math.abs(v) < 1e-9 && yMin < 0 ? '#5d6e73' : '#e3e8e5'}"/><text x="${L - 8}" y="${Y(v) + 4}" text-anchor="end" font-size="14" fill="#5d6e73">${yFmt(v)}</text>`).join('')}
       ${xt.map(v => `<text x="${X(v)}" y="${H - B + 18}" text-anchor="middle" font-size="14" fill="#5d6e73">${xFmt(v)}</text>`).join('')}
       <text x="${L + pw / 2}" y="${H - 6}" text-anchor="middle" font-size="14" fill="#5d6e73">${ui.esc(xLabel)}</text>
       <text x="14" y="${T + ph / 2}" text-anchor="middle" font-size="14" fill="#5d6e73" transform="rotate(-90 14 ${T + ph / 2})">${ui.esc(yLabel)}</text>
