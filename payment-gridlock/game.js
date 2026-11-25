@@ -126,7 +126,7 @@
     const s = clean(S.settings), head = `<div class="label">Round ${S.roundNo} · ${esc(S.label)}</div>`;
     if (S.phase === 'instructions') return `${head}<h2>Move the money</h2><div class="split"><div>${rules(s)}${ctx.joinLine()}</div><div>${comparison(S)}</div></div>`;
     const T = S.pub.total || 1, hist = S.pub.hist || [], last = hist[hist.length - 1];
-    const tiles = ui.tiles([['Payments done', `${last ? last.done : 0} of ${T}`, 'hi'], ['Waiting', last ? last.waiting : T], ['Credit used last hour', whole(last ? last.credit : 0)], ['Idle balances at banks with payments waiting', whole(last ? last.idle : 0)]]);
+    const tiles = ui.tiles([['Payments done', `${last ? last.done : 0} of ${T}`, 'hi'], ['Waiting', last ? last.waiting : T], ['Credit used last hour (sum of each bank\'s peak)', whole(last ? last.credit : 0)], ['Idle money at the end of last hour, at banks with payments waiting', whole(last ? last.idle : 0)]]);
     if (S.phase === 'open' || S.phase === 'closed') {
       return `${head}<h2>${S.phase === 'open' ? (S.pending ? 'Settling…' : `Hour ${S.step} of ${s.hours}: send or hold?`) : 'The day is over'}</h2>${tiles}
         <div class="split"><div><div class="banner warn"><strong>${S.nMoved} of ${S.nPlayers} banks have decided</strong>${modeName(s)}. No answer = hold everything this hour.</div>${ctx.joinLine()}</div><div>${chart(S)}</div></div>`;
@@ -141,7 +141,8 @@
   }
   function renderStudent(S, me) {
     const s = clean(S.settings), p = me.priv[S.roundNo] || {};
-    if (S.phase === 'instructions') return `<h2>Get ready</h2><p class="sub">You start with ${whole(s.bal)} and owe ${s.owe} payments of ${whole(PAY)}.</p>`;
+    if (S.phase === 'instructions') return `<h2>Get ready</h2>${ui.brief(`a ${whole(s.bal)} balance and ${s.owe} payments of ${whole(PAY)} to send. Other banks owe you ${s.owe} payments too.`, `each hour, how many of your waiting payments to send.${S.step <= 1 ? ' In hour 1, also a prediction.' : ''}`, s.mode === 'gross' ? `payments settle one at a time. Going below zero means borrowing from the central bank${s.odRate ? ` at ${s.odRate}% of your largest overdraft that hour` : ' for free'}. Waiting costs ${whole(s.delay)} a payment an hour.` : `payments sent in the same hour are netted. Waiting costs ${whole(s.delay)} a payment an hour.`)}
+      <details open><summary>Worked example: three banks in a circle</summary><p class="note" style="margin:6px 0 0">A owes B $100, B owes C $100, C owes A $100, and each starts with $0. If everyone waits for money to arrive, nothing moves and each pays the delay cost. If A sends first, it goes $100 below zero${s.mode === 'gross' && s.odRate ? ` (a ${whole(PAY * s.odRate / 100)} credit fee)` : ''}; B receives $100 and can pay C; C can then pay A, which brings A back to zero. One bank going first moved all three payments.</p></details>`;
     const book = ui.tiles([['Your balance', whole(p.bal)], ['Payments waiting', p.nPend ?? 0], ['Received so far', `${p.recv || 0} of ${s.owe}`], ['Your costs so far', whole((p.fee || 0) + (p.delayCost || 0))]]);
     if (S.phase === 'open') {
       if (S.pending) return '<h2>Settling the hour…</h2>' + book;
@@ -178,8 +179,23 @@
       return { round: h.roundNo, label: h.label, mode: h.settings.mode, credit_fee_pct: h.settings.odRate, display_name: p.name, sends: d.moves.filter(m => m.player === p.id).map(m => `${m.step}:${m.data.send}`).join(' '),
         predict: (d.moves.find(m => m.player === p.id && m.step === 1) || { data: {} }).data.predict ?? '', received: x.recv, missed: x.missed ?? '', credit_fees: (x.fee || 0).toFixed(2), delay: x.delayCost, total_cost: x.cost != null ? x.cost.toFixed(2) : '' }; });
   }
+  function debrief(S, hh) {
+    const r = hh.result, s = clean(hh.settings);
+    return {
+      explain: `${pct(r.done2)} of payments were done by hour ${r.predHour}${r.predict != null ? ` (the class predicted ${pct(r.predict)})` : ''} and ${pct(r.doneEnd)} by the end of the day. Peak intraday credit was ${whole(r.peakCredit)}. Every bank was owed exactly what it owed, so explain how one bank's waiting made the next bank wait${s.mode === 'gross' && s.odRate ? ', and why the credit fee made waiting look sensible to each bank' : ''}.`,
+      transfer: s.mode === 'net' ? 'Netting needed far less money during the day. What happens if one bank fails before the end-of-hour settlement: whose payments unwind, and who is left short? Why does the Fed\'s own system, Fedwire, settle each payment in full as it goes?'
+        : 'The Fed lends intraday credit to banks and charges a fee for large overdrafts. In March 2020 payments surged and banks hoarded cash. What could a central bank do to keep payments moving, and what risk would it take on?',
+      check: { q: 'Three banks each start with $0. A owes B $100, B owes C $100, and C owes A $100. Payments settle one at a time. If A sends first by borrowing $100 of intraday credit, how much credit does the system need to make all three payments?',
+        options: [['a', '$100: A\'s, and only until C pays A'], ['b', '$300: one overdraft for each bank'], ['c', '$0: the payments cannot settle without money'], ['d', 'They cannot all be made']], answer: 'a',
+        why: 'Once A\'s payment lands, B can pay C, and C can pay A, which repays A\'s overdraft. $100 of credit settles $300 of payments. If everyone waits for someone else, nothing moves: gridlock. With netting, each bank\'s net position is zero, so no money is needed at all.',
+        trap: 'thinking each payment needs its own money. The same balance can settle a chain of payments if someone goes first.' }
+    };
+  }
+
   const game = { id: 'gridlock', title: 'Payment Gridlock', tagline: 'Every bank owes as much as it is owed. Will the money move, or will everyone wait for someone else to pay first?',
     fields, presets, buildSettings, rules, steps, assign, afterStep, resolve, renderProjector, renderStudent, wireStudent, renderInstructor, sim, exportRows,
+    debrief, nonresponse: 'the bank holds all its payments this hour; they keep waiting and the delay cost applies.',
+    compare: { metric: 'the share of payments done by hour 2', note: 'Every round uses the same network of obligations and the same starting balances; only the settlement rule or the credit fee changes. Students have also learned from earlier rounds.' },
     openLabel: 'Open hour 1', stepLabel: S => `End hour ${S.step}; settle`, closeLabel: S => S.step >= steps(S.settings) ? 'End the last hour' : 'End the day now', model: { network, hour } };
   window.CLASSROOM_GAME = game;
   if (!window.CLASSROOM_NO_START) window.Classroom.start(game);

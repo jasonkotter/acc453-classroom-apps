@@ -21,7 +21,19 @@
      renderInstructor?(S, ctx) -> html (a live summary for the instructor)
      controls?(S, list, h) -> list (add or change instructor buttons)
      sim?(state, rng) -> {submit: data} | {trade: tag} | null   (simulated students)
-     exportRows?(h, data) -> [{...}] (one CSV row per student per round)            */
+     exportRows?(h, data) -> [{...}] (one CSV row per student per round)
+   Teaching supports (all optional):
+     nonresponse: text saying what happens to a student who does not answer a step
+       ("they keep all their deposits"). Shown to the instructor and in the warning when
+       a step is ended with many unanswered.
+     expected?(S) -> how many students should answer this step (default: everyone in the
+       round, or no warning when the step is limited to some roles).
+     waitTask?(S) -> html for a student who joined after the round began.
+     compare: {metric, note} for the card that sets this round beside the last one (what
+       changed, what stayed fixed, how many played), or false for no card.
+     debrief?(S, h) -> {explain, transfer, next?, check?: {q, options: [[id, text]], answer,
+       why, trap}} for the debrief phase: prompts on the projector and phones, and a
+       private exit check on each phone (not recorded, not graded, not timed).        */
 (function () {
   'use strict';
 
@@ -76,6 +88,8 @@
   };
   /* A live countdown: <span data-ends="serverMs"></span>, kept current by the toolkit. */
   ui.countdown = ends => `<span class="countdown" data-ends="${Number(ends) || 0}">—</span>`;
+  /* The three-line card before a decision: what you hold, what you decide, what follows. */
+  ui.brief = (have, choose, next) => `<div class="brief"><p><b>You have</b> ${have}</p><p><b>You choose</b> ${choose}</p><p><b>What happens next</b> ${next}</p></div>`;
   ui.phaseNames = { lobby: 'Lobby', instructions: 'Instructions', open: 'Submissions open', closed: 'Submissions closed', revealed: 'Results revealed', debrief: 'Debrief' };
 
   const loadScript = src => new Promise(res => { const s = document.createElement('script'); s.src = src; s.onload = () => res(true); s.onerror = () => res(false); document.head.appendChild(s); });
@@ -128,6 +142,7 @@
                 <div class="field"><label for="nameInput">Display name</label><input id="nameInput" maxlength="24" autocomplete="nickname" placeholder="e.g., Alex"></div>
                 <button class="btn primary" id="joinBtn">Join</button></div>
               <p class="msg bad" id="joinMsg" aria-live="polite"></p></div>
+            <div id="netMsg" class="banner warn hidden" role="status"><strong>Reconnecting…</strong>This phone lost touch with the session. It keeps trying on its own. Answers you already sent are safe; anything sent while offline will show an error, so send it again once this message goes away.</div>
             <div id="studentBody" aria-live="polite"></div></article>
           <aside class="card"><h2>How it works</h2><div id="studentRules"><p class="sub">The rules for each round appear here once the instructor sets it up.</p></div></aside>
         </div></section>
@@ -144,9 +159,9 @@
               <p class="note" id="presetNote"></p>
               <div class="settings" id="settingsBox"></div>
               <div class="actions" id="flowBtns"></div>
-              <div class="banner"><strong id="instPhase">Lobby</strong><span id="instCounts"></span></div>
+              <div class="banner"><strong id="instPhase">Lobby</strong><span id="instCounts"></span><span class="note" id="instNonresp" style="display:block"></span></div>
               <p class="msg bad" id="instMsg" aria-live="polite"></p>
-              <div class="actions"><button class="btn secondary hidden" id="bSims">Add 20 simulated students</button><button class="btn secondary" id="bExport">Export CSV</button><button class="btn danger" id="bReset">Reset</button></div>
+              <div class="actions"><button class="btn secondary hidden" id="bSims">Add 20 simulated students</button><button class="btn secondary hidden" id="bSimPause">Pause simulated students</button><button class="btn secondary" id="bExport">Export CSV</button><button class="btn danger" id="bReset">Reset</button></div>
             </article>
             <aside class="card"><h2>Session</h2><div class="joincode" id="instCode">—</div>
               <p class="note">Students join at <span id="instJoin"></span></p>
@@ -166,7 +181,7 @@
     let view = ['student', 'instructor', 'projector'].includes(params.get('view')) ? params.get('view') : 'student';
     let code = LIVE ? (params.get('code') || (view === 'student' ? player && player.code : host && host.code) || '').toUpperCase() : 'DEMO';
     if (player && LIVE && code && player.code !== code) player = null;
-    let S = null, lastSig = '', channel = null, clockOffset = 0, busy = false;
+    let S = null, lastSig = '', channel = null, clockOffset = 0, busy = false, netDown = false;
     const live = { history: [] };   // projector-side memory (e.g. a live timeline), reset each round
 
     /* ---------- instructor helpers given to the game ---------- */
@@ -244,12 +259,33 @@
       }
       btnList = controls();
       $('flowBtns').innerHTML = btnList.map((b, i) => `<button class="btn ${b.secondary ? 'secondary' : 'primary'} ${b.next && b.enabled ? 'next' : ''}" data-i="${i}" ${b.enabled ? '' : 'disabled'}>${esc(b.label)}</button>`).join('');
-      $('flowBtns').querySelectorAll('button').forEach(el => el.onclick = () => hostAct(btnList[Number(el.dataset.i)].run));
+      $('flowBtns').querySelectorAll('button').forEach(el => el.onclick = () => { const b = btnList[Number(el.dataset.i)]; if (confirmNonresponse(b)) hostAct(b.run); });
       $('instPhase').textContent = (S.roundNo ? `Round ${S.roundNo} · ${S.label} · ` : '') + ui.phaseNames[S.phase] + (S.phase === 'open' && game.steps && game.steps(S.settings || {}) > 1 ? ` · step ${S.step}` : '') + (S.pending ? ' · publishing…' : '');
-      $('instCounts').textContent = `${S.nJoined} joined` + (S.roundNo ? ` · ${S.nPlayers} in this round` : '') + (S.phase === 'open' ? ` · ${S.nMoved} answered this step` : '') + (S.phase === 'instructions' && S.nPlayers < 1 ? ' · needs at least one student before opening' : '');
+      const exp = S.phase === 'open' && !S.pending ? expectedNow() : null;
+      $('instCounts').textContent = `${S.nJoined} joined` + (S.roundNo ? ` · ${S.nPlayers} in this round` : '') + (S.phase === 'open' ? ` · ${S.nMoved}${exp != null ? ' of ' + exp : ''} answered this step` + (exp != null && exp > S.nMoved ? ` (${exp - S.nMoved} still to answer)` : '') : '') + (S.phase === 'instructions' && S.nPlayers < 1 ? ' · needs at least one student before opening' : '');
+      $('instNonresp').textContent = S.phase === 'open' && !S.pending && game.nonresponse && inputSpec() ? 'No answer this step: ' + game.nonresponse : '';
+      const nb = liveBots().length;
+      if (nb) $('instCounts').textContent += ` · ${nb} simulated${botsPaused ? ' (paused)' : ''}`;
+      $('bSimPause').classList.toggle('hidden', !nb); $('bSimPause').textContent = botsPaused ? 'Resume simulated students' : 'Pause simulated students';
       $('instCode').textContent = S.code; $('instJoin').textContent = LIVE ? `${baseUrl}?code=${S.code}` : baseUrl;
       $('projLink').href = `${baseUrl}?view=projector${LIVE ? '&code=' + S.code : params.has('demo') ? '&demo=1' : ''}`;
       preserve($('instResult'), () => { $('instResult').innerHTML = game.renderInstructor ? game.renderInstructor(S, ctxFor()) || '' : ''; });
+    }
+    /* Nonresponse: who should be answering now, and a check before a step is ended early. */
+    function inputSpec() { const inp = (S && S.settings && S.settings.input) || {}; return inp[String(S.step)] || inp['*'] || null; }
+    function expectedNow() {
+      if (!S || S.phase !== 'open' || S.pending || !inputSpec()) return null;
+      if (game.expected) return game.expected(S);
+      return inputSpec().role != null ? null : S.nPlayers;
+    }
+    function confirmNonresponse(b) {
+      const ends = b.endsStep != null ? b.endsStep : ['step', 'close'].includes(b.id);
+      if (!ends || !S || S.phase !== 'open' || S.pending) return true;
+      const exp = expectedNow(); if (exp == null || exp <= 0) return true;
+      const missing = exp - S.nMoved; if (missing <= 0 || (S.nMoved > 0 && missing / exp < 0.15)) return true;
+      return confirm(`${S.nMoved} of ${exp} students have answered this step; ${missing} have not.` +
+        (game.nonresponse ? `\n\nIf you go on, anyone who has not answered is treated this way: ${game.nonresponse}` : '\n\nIf you go on, they are recorded as no answer.') +
+        '\n\nThose are defaults, not choices: say so when you discuss the results.\n\nGo on anyway?');
     }
     async function hostAct(fn) {
       if (busy) return; busy = true; $('instMsg').textContent = '';
@@ -271,7 +307,9 @@
     }
     async function studentAct(fn) {
       try { S = await fn(); lastSig = ''; render(); ping(true); return true; }
-      catch (e) { await refresh(true); const el = $('receipt'); if (el) { el.textContent = e.message; el.className = 'msg bad'; } return false; }
+      catch (e) {
+        const msg = /fetch|network|load failed|timed? ?out/i.test(e.message) ? 'That did not reach the server. Check your connection, then send it again.' : e.message;
+        await refresh(true); const el = $('receipt'); if (el) { el.textContent = msg; el.className = 'msg bad'; } return false; }
     }
     /* Keep what a student is typing when the screen redraws. */
     function preserve(root, draw) {
@@ -295,11 +333,65 @@
       const me = S.me, inRound = S.roundNo > 0 && me.eligibleFrom <= S.roundNo && (S.phase === 'instructions' || !game.assign || !!me.priv[S.roundNo]);
       let html;
       if (S.phase === 'lobby') html = `<h2>You're in, ${esc(me.name)}</h2><p class="sub">Waiting for the instructor to set up the first round.</p>${game.showTag ? `<p class="note">Your trading tag</p><div class="tagbig">${esc(me.tag)}</div>` : ''}`;
-      else if (!inRound) html = `<h2>You're in, ${esc(me.name)}</h2><div class="banner warn"><strong>This round began before you joined.</strong>You play from the next round.</div>`;
-      else html = game.renderStudent(S, me, ctxFor());
+      else if (!inRound) html = `<h2>You're in, ${esc(me.name)}</h2><div class="banner warn"><strong>This round began before you joined.</strong>You play from the next round.</div>` +
+        (game.waitTask ? game.waitTask(S) : `<h3>While you wait</h3><ol class="rules"><li>Read <b>How it works</b> on this page.</li><li>Decide what you would choose this round, and what you expect the class result to be. Jot both down.</li><li>Watch the projector. When the results appear, check your prediction and be ready to explain any gap.</li></ol>`) +
+        (S.phase === 'debrief' ? debriefStudent() : '');
+      else html = game.renderStudent(S, me, ctxFor()) + (S.phase === 'debrief' ? debriefStudent() : '');
       const root = $('studentBody');
       preserve(root, () => { root.innerHTML = html; });
       if (inRound && game.wireStudent && S.phase !== 'lobby') game.wireStudent(root, ctxFor());
+      wireDebrief(root);
+    }
+
+    /* ---------- the debrief: explain, transfer, a private exit check ---------- */
+    const thisRound = () => S && S.history.find(x => x.roundNo === S.roundNo);
+    function debriefFor() { const hh = thisRound(); if (!game.debrief || !hh) return null; try { return game.debrief(S, hh, ui) || null; } catch (e) { return null; } }
+    const XKEY = () => `cls-exit-${game.id}-${code}-${S.roundNo}`;
+    function debriefProjector() {
+      const d = debriefFor(); if (!d) return '';
+      return `<div class="debrief"><div class="label">Debrief · talk with a neighbor, then share</div><ol class="dsteps">
+        ${d.explain ? `<li><b>Explain.</b> ${d.explain}</li>` : ''}${d.transfer ? `<li><b>Transfer.</b> ${d.transfer}</li>` : ''}
+        ${d.check ? '<li><b>Exit check.</b> One question on your phone, just for you: not graded, not timed, no names. The reasoning shows after you answer.</li>' : ''}
+        ${d.next ? `<li><b>Before the next round, predict.</b> ${d.next}</li>` : ''}</ol></div>`;
+    }
+    function debriefStudent() {
+      const d = debriefFor(); if (!d) return '';
+      const c = d.check, pick = c ? sessionStorage.getItem(XKEY()) : null, right = c && pick === c.answer;
+      const ans = c ? (c.options.find(o => o[0] === c.answer) || [])[1] : '';
+      return `<div class="debrief"><div class="label">Debrief</div>
+        ${d.explain ? `<p><b>Explain.</b> ${d.explain}</p>` : ''}${d.transfer ? `<p><b>Transfer.</b> ${d.transfer}</p>` : ''}
+        ${c ? `<h3>Exit check, just for you</h3><p class="note" style="margin-top:-4px">Not recorded, not graded, not timed.</p><p style="font-weight:650">${c.q}</p>
+          <div style="display:grid;gap:8px">${c.options.map(o => `<button class="choice" data-xc="${esc(o[0])}" aria-pressed="${pick === o[0]}"><b style="display:inline;font-size:1rem">${esc(String(o[0]).toUpperCase())}.</b> <span style="display:inline;color:var(--ink)">${o[1]}</span></button>`).join('')}</div>
+          ${pick ? `<div class="banner ${right ? '' : 'bad'}" role="status"><strong>${right ? '✔ Right.' : `✖ Not quite. The answer is ${esc(String(c.answer).toUpperCase())}: ${ans}`}</strong>${c.why || ''}${c.trap ? `<span style="display:block;margin-top:6px"><b>A common mistake:</b> ${c.trap}</span>` : ''}</div>` : ''}` : ''}
+        ${d.next ? `<p><b>Before the next round, predict.</b> ${d.next}</p>` : ''}</div>`;
+    }
+    function wireDebrief(root) {
+      root.querySelectorAll('[data-xc]').forEach(b => b.onclick = () => { sessionStorage.setItem(XKEY(), b.dataset.xc); renderStudent(); });
+    }
+
+    /* ---------- this round beside the last: what changed, what stayed fixed ---------- */
+    function fmtField(f, v) {
+      if (v === undefined || v === null) return '—';
+      if (f.type === 'checkbox') return v ? 'on' : 'off';
+      if (f.type === 'select') { const o = (f.options || []).find(x => String(x[0]) === String(v)); return o ? o[1] : String(v); }
+      return ui.num(v, Number.isInteger(Number(v)) ? 0 : 1);
+    }
+    function compareCard(prev, cur, curN, predicting) {
+      if (game.compare === false || !prev || !cur || !cur.settings) return '';
+      const fs = (game.fields || []).filter(f => prev.settings && prev.settings[f.id] !== undefined && cur.settings[f.id] !== undefined);
+      const changed = fs.filter(f => String(prev.settings[f.id]) !== String(cur.settings[f.id])), same = fs.filter(f => !changed.includes(f));
+      const cmp = game.compare || {}, n0 = prev.nPlayers, rosterNote = n0 != null && curN != null && n0 !== curN;
+      return `<div class="compare"><div class="label">This round beside round ${prev.roundNo} (${esc(prev.label)})</div>
+        <p><b>Changed:</b> ${changed.length ? changed.map(f => `${esc(f.label)}: ${esc(fmtField(f, prev.settings[f.id]))} → <b>${esc(fmtField(f, cur.settings[f.id]))}</b>`).join('; ') : 'none of the settings.'}</p>
+        ${same.length ? `<p><b>Held fixed:</b> ${same.map(f => esc(f.label.replace(/\s*\(.*\)$/, ''))).join(', ')}.</p>` : ''}
+        <p><b>Players:</b> ${n0 != null ? n0 : '—'} then, ${curN != null ? curN : '—'} ${predicting ? 'so far' : 'now'}${rosterNote ? ' (the group changed)' : ''}. ${cmp.note || 'Choices, random assignments, and what the class learned last round differ too, so read a gap as suggestive, not a clean measurement.'}</p>
+        ${predicting && cmp.metric ? `<p class="predict"><b>Predict before you play:</b> compared with round ${prev.roundNo}, will ${cmp.metric} go up or down, by about how much, and why? Write it down.</p>` : ''}</div>`;
+    }
+    function compareNow() {
+      if (!S || !S.history.length) return '';
+      if (S.phase === 'instructions') { const prev = S.history[S.history.length - 1]; return compareCard(prev, { settings: S.settings }, S.nPlayers, true); }
+      if (S.phase === 'debrief') { const i = S.history.findIndex(x => x.roundNo === S.roundNo); return i > 0 ? compareCard(S.history[i - 1], S.history[i], S.history[i].nPlayers, false) : ''; }
+      return '';
     }
 
     /* ---------- the projector ---------- */
@@ -310,7 +402,8 @@
         root.innerHTML = `<div class="label">${esc(game.title)}</div><h2>Join on your phone</h2><div class="split"><div><p class="sub">Open this page on your phone${LIVE ? ' and enter the code' : ''}.</p><div class="joincode">${esc(S.code)}</div><p style="word-break:break-all"><b>${esc(baseUrl)}</b></p><p class="banner"><strong>${S.nJoined} joined</strong>Waiting for the instructor to set up the first round.</p></div><div id="qr"></div></div>`;
         drawQR(); return;
       }
-      root.innerHTML = game.renderProjector(S, ctxFor());
+      const inner = game.renderProjector(S, ctxFor());
+      root.innerHTML = S.phase === 'debrief' ? debriefProjector() + compareNow() + inner : S.phase === 'instructions' ? inner + compareNow() : inner;
       if (game.wireProjector) game.wireProjector(root, ctxFor());
     }
     async function drawQR() {
@@ -327,7 +420,8 @@
       document.body.classList.toggle('proj', view === 'projector');
       document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === view));
       document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-selected', String(t.dataset.view === view)));
-      $('phaseText').textContent = (S ? ui.phaseNames[S.phase] : 'Not connected') + (LIVE ? '' : ' · Local demo');
+      $('phaseText').textContent = (netDown ? 'Reconnecting… · ' : '') + (S ? ui.phaseNames[S.phase] : 'Not connected') + (LIVE ? '' : ' · Local demo');
+      $('netMsg').classList.toggle('hidden', !(netDown && view === 'student' && player));
       if (view === 'student') renderStudent();
       if (view === 'instructor') renderInstructor();
       if (view === 'projector') renderProjector();
@@ -349,10 +443,11 @@
           if (view === 'student' && player && !S.me) { player = null; idStore.removeItem(PKEY); }
           remember();
         } else S = null;
-      } catch (e) { if (/No session/.test(e.message)) { S = null; if (view === 'student') { player = null; idStore.removeItem(PKEY); } } }
+        netDown = false;
+      } catch (e) { if (/No session/.test(e.message)) { netDown = false; S = null; if (view === 'student') { player = null; idStore.removeItem(PKEY); } } else netDown = true; }
       refreshing = false;
       const strip = view === 'student' && S ? Object.assign({}, S, { nJoined: 0, nMoved: 0, nDone: 0, now: 0 }) : S && Object.assign({}, S, { now: 0 });
-      const sig = JSON.stringify([strip, view, player && player.id, host && host.code]);
+      const sig = JSON.stringify([strip, view, player && player.id, host && host.code, netDown]);
       if (force || sig !== lastSig) { lastSig = sig; render(); }
     }
     function tick() {
@@ -365,11 +460,21 @@
     }
     const ping = studentSide => { if (channel && (view === 'instructor' || studentSide && game.broadcastStudentActions)) channel.send({ type: 'broadcast', event: 'tick', payload: {} }); };
 
-    /* ---------- simulated students (local demo) ---------- */
+    /* ---------- simulated students ----------
+       Local demo: the demo backend's own simulated players. Live: real players named "Bot 1",
+       "Bot 2", … joined to this session; their secrets are kept in this browser, and they play
+       only while this instructor page is open and not paused. */
+    const BKEY = () => `cls-bots-${game.id}-${code}`;
+    const liveBots = () => (LIVE && code && readJSON(localStorage, BKEY())) || [];
+    let botsPaused = false, simBusy = false;
     async function runSims() {
-      if (LIVE || view !== 'instructor' || !game.sim || busy) return;
-      const sims = api.simPlayers(); if (!sims.length) return;
-      await simTick(api, 'DEMO', sims, game, Math.random);
+      if (view !== 'instructor' || !game.sim || busy || simBusy) return;
+      simBusy = true;
+      try {
+        if (!LIVE) { const sims = api.simPlayers(); if (sims.length) await simTick(api, 'DEMO', sims, game, Math.random); }
+        else if (!botsPaused && S && S.phase === 'open' && !S.pending) { const b = liveBots(); if (b.length && await simTick(api, code, b, game, Math.random).then(r => r.length)) ping(); }
+      } catch (e) { /* a failed bot move is retried on the next pass */ }
+      simBusy = false;
     }
 
     /* ---------- events ---------- */
@@ -392,8 +497,20 @@
       try { const r = await api.create($('hostKey').value, game.id); $('hostKey').value = ''; host = { code: r.code, hostSecret: r.hostSecret }; localStorage.setItem(HKEY, JSON.stringify(host)); code = r.code; subscribe(); await refresh(true); }
       catch (e) { $('hostMsg').textContent = e.message; }
     };
-    $('bSims').classList.toggle('hidden', LIVE || !game.sim);
-    $('bSims').onclick = async () => { for (let i = 1; i <= 20; i++) await api.join('DEMO', `Student ${Math.floor(Math.random() * 900 + 100)}`, true); refresh(true); };
+    $('bSims').classList.toggle('hidden', !game.sim);
+    if (LIVE) $('bSims').textContent = 'Add 10 simulated students';
+    $('bSims').onclick = async () => {
+      if (!LIVE) { for (let i = 1; i <= 20; i++) await api.join('DEMO', `Student ${Math.floor(Math.random() * 900 + 100)}`, true); return refresh(true); }
+      if (!code) return;
+      if (!confirm('Add 10 simulated students (named Bot 1, Bot 2, …) to this live session?\n\nThey stay in the session for good and play only while this instructor page is open. Use a practice session, not one you will run with the class.')) return;
+      const b = liveBots(); $('instMsg').textContent = 'Adding simulated students…';
+      try {
+        for (let i = 0; i < 10; i++) { const name = `Bot ${b.length + 1}`, p = await api.join(code, name); b.push({ id: p.id, secret: p.secret, tag: p.tag, name }); localStorage.setItem(BKEY(), JSON.stringify(b)); }
+        $('instMsg').textContent = '';
+      } catch (e) { $('instMsg').textContent = e.message; }
+      refresh(true);
+    };
+    $('bSimPause').onclick = () => { botsPaused = !botsPaused; refresh(true); };
     $('bExport').onclick = async () => {
       try {
         const rows = [];
@@ -419,7 +536,7 @@
     await refresh(true);
     setInterval(refresh, LIVE ? (view === 'student' ? 3000 : 2000) : 1200);
     setInterval(tick, 500);
-    if (!LIVE) setInterval(async () => { await runSims(); }, 1500);
+    setInterval(runSims, 1500);
     return { api, h };
   }
 

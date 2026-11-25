@@ -39,6 +39,8 @@ token for a good."
 
 ## Debrief questions
 
+**On screen.** **Begin debrief** puts three things on the projector and on every phone: an *explain* prompt that quotes this round's numbers, a *transfer* question, and a private exit check (one question on the phone; the reasoning and a common mistake appear after the student answers). Give pairs about two minutes for the first two, then a minute for the exit check. Exit-check answers are not recorded, graded, or timed. When you show the next round, the projector also lists what changed from the last round and what stayed fixed, and asks for a prediction before anyone plays. The questions below go deeper.
+
 - Why did barter stall? What did you need to find?
 - Did anyone take a good they did not want? Which good would you have taken, and why?
 - What did the token do? Would it have worked if no one trusted it?

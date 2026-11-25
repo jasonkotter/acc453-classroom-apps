@@ -58,6 +58,8 @@ None of this is guaranteed. If the class holds together through three plays, tha
 
 ## Debrief questions
 
+**On screen.** **Begin debrief** puts three things on the projector and on every phone: an *explain* prompt that quotes this round's numbers, a *transfer* question, and a private exit check (one question on the phone; the reasoning and a common mistake appear after the student answers). Give pairs about two minutes for the first two, then a minute for the exit check. Exit-check answers are not recorded, graded, or timed. When you show the next round, the projector also lists what changed from the last round and what stayed fixed, and asks for a prediction before anyone plays. The questions below go deeper.
+
 - Those of you who withdrew without needing to: what did you see, or expect, that made you leave? (Look for answers about other depositors, not about the bank.)
 - Look at the guesses. Why did the students who ran expect more withdrawals than the students who held, when they were all looking at the same bank?
 - When the count went past the number who needed cash, what did you conclude? Could you tell a depositor who needed money from one who was nervous?

@@ -79,7 +79,7 @@
     const res = { mode: s.mode, rise, size: s.size, n: rows.length, groups, avgLong: ui.mean(rows.map(r => r.long)),
       moves: { short: [moveOf(BONDS.short, s.size), moveOf(BONDS.short, -s.size)], long: [moveOf(BONDS.long, s.size), moveOf(BONDS.long, -s.size)] } };
     if (s.mode === 'investor') Object.assign(res, { right2: rows.length ? rows.filter(r => r.r2).length / rows.length : null, right10: rows.length ? rows.filter(r => r.r10).length / rows.length : null, avg: ui.mean(rows.map(r => rise ? r.up : r.down)) });
-    else Object.assign(res, { failedRise: rows.filter(r => r.a.failed).length, realized: ui.sum(rows.map(r => r.a.realized)), unrealized: ui.sum(rows.map(r => r.a.unrealized)), bookOkMarketBad: rows.filter(r => r.a.book >= 0 && r.a.market < 0).length });
+    else Object.assign(res, { failedRise: rows.filter(r => r.a.failed).length, failCash: rows.filter(r => r.a.unpaid > 1e-9).length, realized: ui.sum(rows.map(r => r.a.realized)), unrealized: ui.sum(rows.map(r => r.a.unrealized)), bookOkMarketBad: rows.filter(r => r.a.book >= 0 && r.a.market < 0).length });
     return { result: res, private: priv };
   }
 
@@ -87,16 +87,19 @@
   const signed = x => (x >= 0 ? '+' : '−') + (Math.abs(x) * 100).toFixed(1) + '%';
   function rules(s) {
     s = clean(s);
-    const bondLine = `The <b>2-year bond</b> pays ${BONDS.short.coupon}% and the <b>10-year bond</b> ${BONDS.long.coupon}% a year; both sell at face value today.`;
+    const bondLine = `The <b>2-year bond</b> pays ${BONDS.short.coupon}% and the <b>10-year bond</b> ${BONDS.long.coupon}% a year; both sell at face value today. A move of one <i>point</i> means the yield goes from, say, 4.5% to 5.5%: one percentage point, not a 1% change in the yield. Bonds are repriced the moment rates move, before any coupon is paid.`;
     if (s.mode === 'investor') return `<ul class="rules"><li>Split <b>$100,000</b> among cash, the 2-year bond, and the 10-year bond (whole percents that add to 100).</li><li>${bondLine}</li><li>Then rates on both bonds move <b>${s.size} point${s.size === 1 ? '' : 's'}</b>, up or down${s.shock === 'draw' ? ', 50/50' : ''}, and your bonds are repriced at once.</li><li>First, predict how each bond's price moves if rates <b>rise</b> ${s.size} point. Predictions are scored separately.</li></ul>`;
     return `<ul class="rules"><li>You run a bank: <b>$100 of deposits</b> (you pay ${DEPOSIT_RATE}%) and <b>$10 of equity</b>, so $110 to invest.</li><li>Split it among cash (earns ${CASH_YIELD}%), the 2-year bond, and the 10-year bond. ${bondLine}</li>
       <li>If rates hold, you earn a year's interest. If rates <b>rise ${s.size} points</b>${s.shock === 'draw' ? ' (50/50)' : ''}, bond prices fall and <b>${s.withdraw}% of deposits are withdrawn</b>: you pay from cash, then sell 2-year bonds, then 10-year bonds, at today's prices.</li>
-      <li>If, at today's prices, your assets are worth less than the deposits you still owe, the rest of your depositors run: <b>your bank fails</b>.</li></ul>`;
+      <li>If you cannot pay the withdrawals, or if, at today's prices, your assets are worth less than the deposits you still owe, the rest of your depositors run: <b>your bank fails</b>. That failure rule is a simplification for the game; real banks are closed by regulators, and bonds held to maturity are carried on the books at cost.</li></ul>`;
   }
+  /* The cash flows behind each bond, per $100 of face value. */
+  const TIMELINE = `<details open><summary>Cash flows per $100 of each bond</summary>${ui.table(['', 'Years 1 to N−1', 'Final year'], [['2-year bond (N = 2)', `$${BONDS.short.coupon.toFixed(2)} a year`, `$${(100 + BONDS.short.coupon).toFixed(2)} in year 2`], ['10-year bond (N = 10)', `$${BONDS.long.coupon.toFixed(2)} a year`, `$${(100 + BONDS.long.coupon).toFixed(2)} in year 10`]])}
+    <p class="note" style="margin-top:4px">When rates rise, every one of these payments is discounted more heavily. The later the payment, the bigger the hit.</p></details>`;
   function renderProjector(S, ctx) {
     const s = clean(S.settings), head = `<div class="label">Round ${S.roundNo} · ${esc(S.label)}</div>`;
     if (S.phase === 'instructions' || S.phase === 'open' || S.phase === 'closed')
-      return `${head}<h2>${s.mode === 'investor' ? 'Build a bond portfolio' : 'Run a bank'}</h2><div class="split"><div>${rules(s)}</div><div>${S.phase === 'open' ? `<div class="banner warn"><strong style="font-size:1.3em">${S.nMoved} of ${S.nPlayers} in</strong>Choose on your phone.</div>` : ''}${ctx.joinLine()}</div></div>`;
+      return `${head}<h2>${s.mode === 'investor' ? 'Build a bond portfolio' : 'Run a bank'}</h2><div class="split"><div>${rules(s)}</div><div>${TIMELINE}${S.phase === 'open' ? `<div class="banner warn"><strong style="font-size:1.3em">${S.nMoved} of ${S.nPlayers} in</strong>Choose on your phone.</div>` : ''}${ctx.joinLine()}</div></div>`;
     const h = S.history.find(x => x.roundNo === S.roundNo); if (!h) return head;
     const r = h.result, m = r.moves;
     if (r.mode === 'investor') {
@@ -108,14 +111,14 @@
     }
     return `${head}<div class="split"><div><div class="label">${r.rise ? `Rates rose ${r.size} points and deposits left` : 'Rates held: a quiet year'}</div><div class="lead">${r.rise ? `${r.failedRise} of ${r.n} banks failed` : 'No bank failed'}</div>
       ${r.rise ? `<p class="sub">${r.bookOkMarketBad} of them still looked solvent at cost, the way held-to-maturity bonds are carried. That was SVB.</p>` : `<p class="sub">Had rates risen, ${r.failedRise} of ${r.n} would have failed.</p>`}
-      ${ui.tiles([['Losses realized by selling bonds', '$' + r.realized.toFixed(0)], ['Losses on bonds still held', '$' + r.unrealized.toFixed(0)]], 'two')}
+      ${r.rise ? ui.tiles([['Failed: could not pay the withdrawals', r.failCash ?? '—'], ['Failed: assets worth less than deposits', r.failCash != null ? r.failedRise - r.failCash : '—'], ['Losses realized by selling bonds', '$' + r.realized.toFixed(0)], ['Losses on bonds still held', '$' + r.unrealized.toFixed(0)]]) : ''}
       <p class="note">10-year bond: ${signed(m.long[0])} if rates rise ${r.size} points; 2-year bond ${signed(m.short[0])}.</p></div>
       <div><h3 style="margin-top:0">Reaching for yield</h3>${ui.table(['10-year share', 'Banks', 'Failed if rates rise', 'Equity if rates rise', 'Equity if rates hold'], r.groups.filter(g => g.n).map(g => [`${g.lo}–${g.hi}%`, g.n, pct(g.failRise), ui.money(g.eqRise, 2), ui.money(g.eqHold, 2)]))}
       <p class="note">Equity is at today's prices, starting from $10.</p></div></div>`;
   }
   function renderStudent(S, me) {
     const s = clean(S.settings), mine = me.moves['1'];
-    if (S.phase === 'instructions') return '<h2>Get ready</h2><p class="sub">Read the rules. You will split your money three ways.</p>';
+    if (S.phase === 'instructions') return `<h2>Get ready</h2>${ui.brief(s.mode === 'investor' ? '$100,000 to invest.' : 'a bank: $100 of deposits and $10 of equity, so $110 to invest.', `${s.mode === 'investor' ? 'a prediction of how each bond\'s price moves if rates rise, then ' : ''}how much to put in cash, the 2-year bond, and the 10-year bond.`, s.mode === 'investor' ? `rates move ${s.size} point${s.size === 1 ? '' : 's'}, up or down, and your bonds are repriced at once.` : `rates either hold or rise ${s.size} points; if they rise, ${s.withdraw}% of deposits leave and you may have to sell bonds.`)}${TIMELINE}`;
     if (S.phase === 'open') {
       const v = k => mine ? mine[k] : { cash: 34, short: 33, long: 33 }[k];
       const sel = (id, cur) => `<select id="${id}">${BUCKETS.map(b => `<option value="${b[0]}" ${cur === b[0] ? 'selected' : ''}>${b[1]}</option>`).join('')}</select>`;
@@ -152,9 +155,30 @@
       return { round: h.roundNo, label: h.label, mode: h.result.mode, rates: h.result.rise ? 'rise' : 'other', display_name: p.name, cash: m.data.cash, short: m.data.short, long: m.data.long, p2: m.data.p2 ?? '', p10: m.data.p10 ?? '',
         result: x ? (h.result.mode === 'investor' ? (x.got * 100).toFixed(2) + '%' : x.got.failed ? 'failed' : x.got.market.toFixed(2)) : '' }; }).filter(Boolean);
   }
+  const sgn = signed;
+  function debrief(S, hh) {
+    const r = hh.result, m = r.moves;
+    if (r.mode === 'investor') return {
+      explain: `Rates ${r.rise ? 'rose' : 'fell'} ${r.size} point${r.size === 1 ? '' : 's'}. The 10-year bond moved ${sgn(m.long[r.rise ? 0 : 1])} and the 2-year ${sgn(m.short[r.rise ? 0 : 1])}. Use the cash-flow table to explain why the 10-year moved about ${Math.abs(m.long[0] / m.short[0]).toFixed(0)} times as much. Was your return skill, or luck about which world we drew?`,
+      transfer: 'A pension fund must pay retirees 20 years from now. Which is riskier for it: a 2-year bond or a 20-year bond? Explain why which bond is risky depends on when you need the money.',
+      check: { q: 'A 10-year bond pays 4.5% a year and sells at face value. Its yield rises from 4.5% to 5.5%. Which is closest to what happens to its price?',
+        options: [['a', 'It falls about 7.5%'], ['b', 'It falls about 1%'], ['c', 'It falls about 22%, since 1 is 22% of 4.5'], ['d', 'It rises about 7.5%']], answer: 'a',
+        why: 'Each of the ten years of payments is now discounted at 5.5% instead of 4.5%. The price falls to about $92.46 per $100. A long bond\'s price moves roughly duration × the change in yield, and this bond\'s duration is a bit under 8 years.',
+        trap: 'confusing a one-percentage-point rise in the yield with a 1% (or 22%) change. The price change depends on how far off the payments are, not on the yield\'s percent change.' } };
+    return {
+      explain: `${r.rise ? `${r.failedRise} of ${r.n} banks failed when rates rose; ${r.bookOkMarketBad} of those still looked solvent with bonds carried at cost.` : `Rates held, but had they risen, ${r.failedRise} of ${r.n} banks would have failed.`} Separate four things for one bank: losses realized by selling, losses on bonds still held, being unable to pay withdrawals today, and owning assets worth less than deposits. Which one made the long-bond banks fail?`,
+      transfer: 'In March 2023 the Fed lent to banks against their bonds at face value (the Bank Term Funding Program). Which failures in this game would that have prevented? Which losses would still be there, and who would bear them?',
+      check: { q: 'A bank has $10 of cash and bonds that cost $100 but are now worth $85. It owes depositors $100. Today depositors withdraw $5. Which is true?',
+        options: [['a', 'At market value it is insolvent, yet it can pay today and looks solvent at cost'], ['b', 'It is solvent, because the bonds are carried at $100'], ['c', 'It must close today because it cannot pay the withdrawals'], ['d', 'It has realized a $15 loss']], answer: 'a',
+        why: 'At today\'s prices: $10 + $85 = $95 against $100 owed, so equity is −$5. At cost it is +$10. The $5 comes out of cash, so it is not short of cash today. Nothing was sold, so the $15 loss is unrealized, but it becomes real if depositors keep leaving and the bonds must be sold.',
+        trap: 'treating an unrealized loss as no loss. Carrying bonds at cost hides the loss on the books; it does not remove it.' } };
+  }
+
   const game = { id: 'bonds', title: 'Bond Showdown', tagline: 'Split your money between cash, short bonds, and long bonds. Then rates move.',
     fields, presets, buildSettings, rules, resolve, renderProjector, renderStudent, wireStudent, renderInstructor, sim, exportRows,
-    openLabel: 'Open choices', closeLabel: () => 'Close choices', model: { price, moveOf, investor, bank, BONDS } };
+    openLabel: 'Open choices', closeLabel: () => 'Close choices', debrief,
+    nonresponse: 'no portfolio is recorded, and the student is left out of this round\'s results.',
+    compare: { note: 'The investor and bank rounds ask different questions with different stakes, so compare the lesson, not the numbers.' }, model: { price, moveOf, investor, bank, BONDS } };
   window.CLASSROOM_GAME = game;
   if (!window.CLASSROOM_NO_START) window.Classroom.start(game);
 })();

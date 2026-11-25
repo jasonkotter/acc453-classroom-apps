@@ -26,12 +26,17 @@
       <li><b>Lenders:</b> name the lowest rate you will lend at. Reserves you do not lend stay at the Fed and earn <b>IORB, ${pctf(s.iorb)}</b>.</li>
       <li><b>Borrowers:</b> name the highest rate you will pay. What you cannot borrow in the market you borrow at the Fed's <b>discount window, ${pctf(s.dw)}</b>.</li>
       <li>All orders clear together at <b>one rate</b> for everyone, where lending meets borrowing. Lenders who asked more, and borrowers who offered less, are left out.</li>
-      <li>Profit: a lender earns the market rate minus IORB on what it lends; a borrower saves the discount rate minus the market rate on what it borrows.</li></ul>`;
+      <li>Profit: a lender earns the market rate minus IORB on what it lends; a borrower saves the discount rate minus the market rate on what it borrows.</li>
+      <li class="note">The game assumes every lender can earn IORB and every borrower can use the window at the stated rate, with no stigma and enough collateral. Real markets bend both edges: some lenders cannot earn IORB, and banks are reluctant to be seen at the window.</li></ul>`;
   }
 
-  function assign({ roster, rng, settings }) {
-    const s = clean(settings), ids = ui.shuffle(roster.map(p => p.id), rng), nL = Math.round(ids.length * s.lenderPct / 100), priv = {};
-    ids.forEach((id, i) => { const q = 10 * (1 + Math.floor(rng() * 10)); priv[id] = { role: i < nL ? 'lender' : 'borrower', q }; });
+  /* Positions are tied to each student for the whole session, so a treatment that changes only
+     the Fed's rates is played with the same reserve positions. A higher share of lenders turns
+     the next students in the same order into lenders; everyone keeps their amount. */
+  function assign({ S, roster, settings }) {
+    const s = clean(settings), key = id => ui.hash(S.code + ':' + id), ids = roster.map(p => p.id).sort((a, b) => key(a) - key(b) || (a < b ? -1 : 1));
+    const nL = Math.round(ids.length * s.lenderPct / 100), priv = {};
+    ids.forEach((id, i) => { const q = 10 * (1 + ui.hash(S.code + ':q:' + id) % 10); priv[id] = { role: i < nL ? 'lender' : 'borrower', q }; });
     const sup = ui.sum(Object.values(priv).filter(p => p.role === 'lender').map(p => p.q)), need = ui.sum(Object.values(priv).filter(p => p.role === 'borrower').map(p => p.q));
     return { private: priv, pub: { supply: sup, need } };
   }
@@ -67,6 +72,12 @@
   }
 
   /* ---------- screens ---------- */
+  /* The chart as a table: at a few rates, how much lenders would lend and borrowers would borrow. */
+  function curveTable(r) {
+    const sup = y => Math.max(0, ...r.supplyCurve.filter(p => p[1] <= y + 1e-9).map(p => p[0])), dem = y => Math.max(0, ...r.demand.filter(p => p[1] >= y - 1e-9).map(p => p[0]));
+    const g = r.dw - r.iorb, ys = [r.iorb, r.iorb + g / 4, r.iorb + g / 2, r.iorb + 3 * g / 4, r.dw];
+    return `<details><summary>The chart as a table</summary>${ui.table(['At a rate of', 'Lenders would lend ($M)', 'Borrowers would borrow ($M)'], ys.map(y => [pctf(y), sup(y), dem(y)]))}<p class="note" style="margin-top:4px">Unfilled shortfalls go to the discount window ($${r.window}M); unlent reserves stay at the Fed ($${r.parked}M).</p></details>`;
+  }
   function chart(r) {
     const xmax = Math.max(r.supply, r.need, 10), lo = Math.min(r.iorb - 0.5, ...r.demand.map(p => p[1]), ...r.supplyCurve.map(p => p[1])), hi = Math.max(r.dw + 0.5, ...r.demand.map(p => p[1]), ...r.supplyCurve.map(p => p[1]));
     const flat = (y, c, label) => ({ points: [[0, y], [xmax, y]], color: c, dash: true, label });
@@ -83,17 +94,21 @@
     const s = clean(S.settings), head = `<div class="label">Round ${S.roundNo} · ${esc(S.label)}</div>`;
     if (S.phase === 'instructions') return `${head}<h2>The fed funds market</h2><div class="split"><div>${rules(s)}${ctx.joinLine()}</div><div>${comparison(S)}</div></div>`;
     if (S.phase === 'open' || S.phase === 'closed') return `${head}<h2>${S.phase === 'open' ? 'Orders are open' : 'Orders are closed'}</h2>
-      ${ui.tiles([['Orders in', `${S.nMoved} of ${S.nPlayers}`, 'hi'], ['Extra reserves, all lenders', '$' + S.pub.supply + 'M'], ['Shortfalls, all borrowers', '$' + S.pub.need + 'M'], ['IORB / discount rate', `${pctf(s.iorb)} / ${pctf(s.dw)}`]])}${ctx.joinLine()}${comparison(S)}`;
+      ${ui.tiles([['Orders in', `${S.nMoved} of ${S.nPlayers}`, 'hi'], ['Extra reserves, all lenders', '$' + S.pub.supply + 'M'], ['Shortfalls, all borrowers', '$' + S.pub.need + 'M'], ['IORB / discount rate', `${pctf(s.iorb)} / ${pctf(s.dw)}`]])}
+      ${S.phase === 'open' ? `<div class="banner warn"><strong>Predict while you wait</strong>Will the market rate land near IORB (${pctf(s.iorb)}), near the discount rate (${pctf(s.dw)}), or in between? Use the two totals above to say why.</div>` : ''}${ctx.joinLine()}${comparison(S)}`;
     const h = S.history.find(x => x.roundNo === S.roundNo); if (!h) return head;
     const r = h.result;
     return `${head}<div class="split"><div><div class="label">The market rate</div><div class="lead">${pctf(r.rate)}</div>
       <p class="sub">${r.rate == null ? 'No trades.' : r.rate - r.iorb < 0.1 * (r.dw - r.iorb) ? 'At the floor: with reserves plentiful, lenders compete down to what the Fed pays them.' : r.dw - r.rate < 0.1 * (r.dw - r.iorb) ? 'At the ceiling: with reserves short, borrowers bid up to the discount rate.' : 'Inside the corridor between IORB and the discount rate.'}</p>
       ${ui.tiles([['Traded', '$' + r.vol + 'M'], ['Borrowed at the window', '$' + r.window + 'M'], ['Left at the Fed', '$' + r.parked + 'M'], ['Orders', r.orders]])}</div>
-      <div>${chart(r)}</div></div>${comparison(S)}`;
+      <div>${chart(r)}${curveTable(r)}</div></div>${comparison(S)}`;
   }
   function renderStudent(S, me) {
     const s = clean(S.settings), p = me.priv[S.roundNo] || {}, mine = me.moves['1'];
-    if (S.phase === 'instructions') return '<h2>Get ready</h2><p class="sub">Your reserve position appears when orders open.</p>';
+    if (S.phase === 'instructions') { const a = Math.round((s.iorb + 0.1) * 100) / 100, b = Math.round((s.dw - 0.2) * 100) / 100, g = (x, y) => ui.money(50e6 * (x - y) / 100 / 360, 0);
+      return `<h2>Get ready</h2>${ui.brief('a reserve position, shown when orders open: extra reserves you could lend, or a shortfall you must cover tonight.', 'one rate: the lowest you will lend at, or the highest you will pay.', `one rate clears the whole market. If you do not trade, a lender earns IORB (${pctf(s.iorb)}) at the Fed and a borrower pays the discount rate (${pctf(s.dw)}).`)}
+      <details open><summary>Worked example: one night, $50 million</summary><p class="note" style="margin:6px 0 0"><b>Lender:</b> lending at ${pctf(a)} instead of leaving it at the Fed at ${pctf(s.iorb)} earns $50M × ${(a - s.iorb).toFixed(2)}% ÷ 360 ≈ ${g(a, s.iorb)} more for the night.<br>
+      <b>Borrower:</b> borrowing at ${pctf(b)} instead of at the window at ${pctf(s.dw)} saves $50M × ${(s.dw - b).toFixed(2)}% ÷ 360 ≈ ${g(s.dw, b)}.<br>So no lender should lend below IORB, and no borrower should pay above the discount rate.</p></details>`; }
     const who = p.role === 'lender' ? `<div class="banner"><strong>You have $${p.q} million of extra reserves.</strong>Lend them in the market, or leave them at the Fed at ${pctf(s.iorb)}.</div>` : `<div class="banner warn"><strong>You are $${p.q} million short of reserves.</strong>Borrow in the market, or at the discount window at ${pctf(s.dw)}.</div>`;
     if (S.phase === 'open') return who + `<div class="row"><div class="field"><label for="ffRate">${p.role === 'lender' ? 'Lowest rate you will lend at (%)' : 'Highest rate you will pay (%)'}</label><input id="ffRate" type="number" min="0" max="10" step="0.01" inputmode="decimal" value="${mine ? mine.rate : ''}"></div><button class="btn primary" id="ffSend">Submit</button></div><p class="msg good" id="receipt">${mine ? `Order in at ${pctf(mine.rate)}. You can change it until orders close.` : ''}</p>`;
     if (S.phase === 'closed') return who + '<p class="sub">Waiting for the market to clear.</p>';
@@ -110,9 +125,30 @@
   function exportRows(h, d) {
     return d.players.filter(p => d.private[p.id]).map(p => { const x = d.private[p.id], m = d.moves.find(y => y.player === p.id); return { round: h.roundNo, label: h.label, iorb: h.result.iorb, discount_rate: h.result.dw, market_rate: h.result.rate, display_name: p.name, role: x.role, amount_m: x.q, order_rate: m ? m.data.rate : '', filled_m: x.filled || 0, gain: x.gain != null ? x.gain.toFixed(0) : '' }; });
   }
+  function debrief(S, hh) {
+    const r = hh.result, first = S.history.find(x => x.result && x.result.iorb != null);
+    const where = r.rate == null ? 'No trades cleared.' : `The rate landed at ${pctf(r.rate)}, between IORB (${pctf(r.iorb)}) and the discount rate (${pctf(r.dw)}).`;
+    const raised = first && r.iorb > first.result.iorb + 1e-9;
+    return {
+      explain: `${where} $${r.vol}M traded, $${r.window}M went to the discount window, and $${r.parked}M stayed at the Fed. Lenders had $${r.supply}M to spare against $${r.need}M of shortfalls. Explain where the rate landed using each side's outside option.`,
+      transfer: 'Since 2021 the effective federal funds rate has usually sat a few hundredths of a point below IORB, not at or above it. Who in the real market cannot earn IORB, and why does that let the rate dip below the "floor"?',
+      check: raised
+        ? { q: 'Reserves stay ample. The Fed raises IORB and the discount rate by a quarter point and does not change the quantity of reserves. In this model, what happens to the market rate?',
+            options: [['a', 'It rises about a quarter point'], ['b', 'It stays put, because reserves did not change'], ['c', 'It falls, because borrowing at the window costs more']], answer: 'a',
+            why: 'With reserves ample, the rate sits near the floor. Lenders will not lend below what the Fed pays them, so raising IORB lifts the floor and the market rate with it. That is how the Fed moves rates today without changing reserves.',
+            trap: 'thinking the Fed must change the quantity of reserves to move the rate. That was true when reserves were scarce; with ample reserves the administered rates do the work.' }
+        : { q: 'IORB is 4.00% and the discount rate 4.50%. A bank with extra reserves is offered 3.90% for an overnight loan. In this model, what should it do?',
+            options: [['a', 'Decline: leaving the reserves at the Fed pays 4.00%'], ['b', 'Accept: some interest beats none'], ['c', 'Borrow more at the window and lend that too']], answer: 'a',
+            why: 'A lender compares the market rate with its outside option. Reserves left at the Fed earn IORB, so lending at 3.90% would lose 0.10% a year. That outside option is why IORB acts as a floor.',
+            trap: 'comparing the market rate with zero instead of with what the bank earns by doing nothing.' }
+    };
+  }
+
   const game = { id: 'fed-funds', title: 'Fed Funds Market', tagline: 'Banks trade reserves overnight. Watch where the rate lands when reserves are scarce, when they are ample, and when the Fed moves its administered rates.',
     fields, presets, buildSettings, rules, assign, resolve, renderProjector, renderStudent, wireStudent, renderInstructor, sim, exportRows, model: { clear },
-    openLabel: 'Open orders', closeLabel: () => 'Close orders' };
+    openLabel: 'Open orders', closeLabel: () => 'Close orders', debrief,
+    nonresponse: 'no order: a lender leaves its reserves at the Fed earning IORB, and a borrower covers its whole shortfall at the discount window.',
+    compare: { metric: 'the market rate', note: 'Each student keeps the same reserve amount all session, and when the share of lenders is unchanged, the same role, so a change in the Fed\'s rates is close to a clean comparison. Students may still bid differently after seeing the last round.' } };
   window.CLASSROOM_GAME = game;
   if (!window.CLASSROOM_NO_START) window.Classroom.start(game);
 })();

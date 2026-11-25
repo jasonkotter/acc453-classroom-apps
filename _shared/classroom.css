@@ -104,3 +104,11 @@ body.proj ul.rules{font-size:1.25rem}
 @media(max-width:860px){.grid,.split{grid-template-columns:minmax(0,1fr)}.tiles,.tiles.three{grid-template-columns:repeat(2,1fr)}.settings{grid-template-columns:1fr 1fr}.hero{display:block}.pill{display:inline-block;margin-top:12px}}
 @media(max-width:420px){.shell{padding:18px 14px 40px}.choices{grid-template-columns:1fr}.settings{grid-template-columns:1fr}.top{padding:12px 14px}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+/* teaching supports: debrief prompts, round comparison */
+.debrief{border-left:4px solid var(--teal);background:#fff;padding:6px 0 6px 16px;margin:18px 0}
+.debrief p{margin:8px 0}
+ol.dsteps{padding-left:1.2em;margin:8px 0}ol.dsteps li{margin:7px 0}
+.compare{background:#f3f6f4;border-radius:12px;padding:10px 14px;margin:14px 0;font-size:.92rem}
+.compare p{margin:5px 0}.compare .predict{background:var(--amber);border-radius:8px;padding:6px 10px}
+body.proj .debrief{font-size:1.25rem;margin:4px 0 14px}body.proj .compare{font-size:1.02rem}
+.brief{display:grid;gap:5px;background:#f3f6f4;border-radius:12px;padding:11px 14px;margin:12px 0;font-size:.93rem}.brief p{margin:0}

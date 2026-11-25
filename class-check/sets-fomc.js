@@ -3,6 +3,8 @@
  "id": "be-the-fomc",
  "title": "Be the FOMC",
  "revote": false,
+ "answerLabel": "FOMC set",
+ "keyNote": "The FOMC's decision and the book's Taylor rule are benchmarks to argue with, not the right answer. The rule here uses a 1% neutral real rate, a 2% target, core PCE inflation, and an output gap from Okun's law, −2 × (unemployment − 4); other reasonable inputs give different numbers. Judge each decision with the data available that day, not with what came later. Ask one team for its reason and the biggest risk it saw.",
  "note": "Mar 25, after 11.8 and 12.1. Six real meetings, June 2021 to July 2023, with the data published by each meeting date. Students (or teams on one phone) set the top of the range; the reveal shows the FOMC and the Taylor rule. Built 2026-11-24 from FRED/ALFRED by build_fomc.py.",
  "questions": [
   {

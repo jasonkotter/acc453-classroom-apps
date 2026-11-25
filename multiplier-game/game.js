@@ -17,8 +17,9 @@
     { id: 'iorb', label: 'Interest on reserves (%)', type: 'number', min: 0, max: 30, step: 0.1 }
   ];
   const presets = [
-    { id: 'textbook', label: 'Textbook banking', note: 'Loans pay 6% and almost all are repaid; reserves pay nothing. Lending beats holding reserves.', values: { steps: 5, rr: 10, drain: 10, loanRate: 6, lossPct: 1, iorb: 0 } },
-    { id: 'ample', label: 'Interest on reserves, riskier loans', note: 'Reserves pay 4.5%; loans pay 6% but 2% are not repaid (4% net). Holding reserves pays more, as after 2008.', values: { steps: 5, rr: 10, drain: 10, loanRate: 6, lossPct: 2, iorb: 4.5 } }
+    { id: 'textbook', label: 'Textbook banking', note: 'Loans pay 6% and almost all are repaid (about 4.9% net); reserves pay nothing. Lending beats holding reserves.', values: { steps: 5, rr: 10, drain: 10, loanRate: 6, lossPct: 1, iorb: 0 } },
+    { id: 'iorb', label: 'Interest on reserves (one change)', note: 'Only one thing changes: reserves pay 5.4%, as in 2023–24. Loans are the same as round 1 (about 4.9% net), so holding reserves now pays a little more.', values: { steps: 5, rr: 10, drain: 10, loanRate: 6, lossPct: 1, iorb: 5.4 } },
+    { id: 'ample', label: 'Interest on reserves and riskier loans (two changes)', note: 'Optional. Two things change at once: reserves pay 4.5%, and 2% of loans are not repaid (about 3.9% net). A comparison with round 1 cannot say which change mattered.', values: { steps: 5, rr: 10, drain: 10, loanRate: 6, lossPct: 2, iorb: 4.5 } }
   ];
   const clean = v => { const n = (x, d, lo, hi) => { x = Number(x); return isFinite(x) ? Math.min(hi, Math.max(lo, x)) : d; };
     return { steps: Math.round(n(v.steps, 5, 2, 8)), rr: n(v.rr, 10, 0, 100), drain: n(v.drain, 10, 0, 100), loanRate: n(v.loanRate, 6, 0, 30), lossPct: n(v.lossPct, 1, 0, 100), iorb: n(v.iorb, 0, 0, 30) }; };
@@ -27,9 +28,9 @@
   function rules(s) {
     s = clean(s);
     return `<ul class="rules">
-      <li>You are a bank. The Fed just bought bonds, and the sellers deposited <b>${whole(D0)} at every bank</b>.</li>
+      <li>You are a bank. The Fed just bought bonds from the public, and the sellers deposited the proceeds: <b>${whole(D0)} of new deposits at every bank</b>, and ${whole(D0)} of new reserves to go with them (the Fed pays the seller's bank in reserves).</li>
       <li>In each of ${s.steps} steps, decide how much of your <b>new deposits</b> to lend. You must keep ${s.rr}% as required reserves; the rest you can lend or keep as extra reserves.</li>
-      <li>Borrowers spend what you lend (keeping ${s.drain}% as cash). The spending is deposited at other banks, so next step you may have new deposits too.</li>
+      <li>A loan creates a deposit for your borrower, who spends it at once, keeping ${s.drain}% of each loan as cash. The rest lands as deposits at other banks, and your reserves go with it to settle the payment. Next step you may receive new deposits, and reserves, from other banks' borrowers.</li>
       <li>Your profit for the year: loans pay ${s.loanRate}%, but ${s.lossPct}% of loans are never repaid (about ${netLoan(s).toFixed(1)}% net); reserves pay ${s.iorb}%.</li>
       <li>If you do not answer in a step, you keep everything as reserves.</li></ul>`;
   }
@@ -88,8 +89,8 @@
   function comparison(S) {
     const done = S.history.filter(h => h.result && h.result.B);
     if (!done.length) return '';
-    return '<h3>Round comparison</h3>' + ui.table(['Round', 'Reserves pay', 'Lent (of what they could)', 'Extra reserves', 'Multiplier after the steps', 'If lending went on'],
-      done.map(h => { const r = h.result; return [`${h.roundNo}. ${esc(h.label)}`, h.settings.iorb + '%', pct(r.lendShare), whole(r.extra), `<b>${r.mult.toFixed(2)}</b>`, r.projMult ? r.projMult.toFixed(1) : '—']; }));
+    return '<h3>Round comparison</h3>' + ui.table(['Round', 'Reserves pay', 'Loans pay, net of losses', 'Lent (of what they could)', 'Extra reserves', 'Multiplier observed', 'Extrapolated limit (same lending share forever)'],
+      done.map(h => { const r = h.result, s = clean(h.settings); return [`${h.roundNo}. ${esc(h.label)}`, s.iorb + '%', netLoan(s).toFixed(1) + '%', pct(r.lendShare), whole(r.extra), `<b>${r.mult.toFixed(2)}</b>`, r.projMult ? r.projMult.toFixed(1) : '—']; }));
   }
   function renderProjector(S, ctx) {
     const s = clean(S.settings), head = `<div class="label">Round ${S.roundNo} · ${esc(S.label)}</div>`;
@@ -103,14 +104,22 @@
     const h = S.history.find(x => x.roundNo === S.roundNo); if (!h) return head;
     const r = h.result;
     return `${head}<div class="split"><div><div class="label">The multiplier</div><div class="lead">${r.mult.toFixed(2)}</div>
-      <p class="sub">after ${r.steps} steps. Banks lent ${pct(r.lendShare)} of what they could. If they kept lending like that, it would reach about <b>${r.projMult ? r.projMult.toFixed(1) : '—'}</b> (the textbook 1/rr = ${r.textbook.toFixed(0)} assumes banks lend everything and no one holds cash).</p>
+      <p class="sub">observed after ${r.steps} steps: money (deposits + cash) ÷ base. Banks lent ${pct(r.lendShare)} of what they could. <b>Extrapolated:</b> if they kept lending that share forever, it would reach about <b>${r.projMult ? r.projMult.toFixed(1) : '—'}</b>. The textbook 1/rr = ${r.textbook.toFixed(0)} assumes banks lend everything and no one holds cash.</p>
       ${ui.tiles([['Base', whole(r.B)], ['Money (deposits + cash)', whole(r.M)], ['Extra reserves held', whole(r.extra)], ['Median bank profit', ui.money(r.medIncome)]])}</div>
       <div>${chart(S)}</div></div>${comparison(S)}`;
   }
+  /* One bank's books: the changes since the Fed's purchase. Deposits received = reserves kept + loans
+     made, because each loan's new deposit was spent at once and left with reserves. */
+  function tAccount(p) {
+    return `<div class="taccount"><div><h4>Assets (changes)</h4><p><span>Reserves</span><span>${whole(p.res || 0)}</span></p><p><span>Loans</span><span>${whole(p.loans || 0)}</span></p></div>
+      <div><h4>Liabilities (changes)</h4><p><span>Deposits received</span><span>${whole(p.depTot || 0)}</span></p></div></div>
+      <p class="note" style="margin-top:-4px">Each loan you make first appears as a deposit for your borrower. When the borrower spends it, that deposit and the same amount of your reserves move to the seller's bank, so what is left is the loan.</p>`;
+  }
   function renderStudent(S, me) {
     const s = clean(S.settings), p = me.priv[S.roundNo] || {};
-    if (S.phase === 'instructions') return `<h2>Get ready</h2><p class="sub">You start with ${whole(D0)} of new deposits.</p>`;
-    const book = ui.tiles([['Your loans', whole(p.loans || 0)], ['Your reserves', whole(p.res || 0)]], 'two');
+    if (S.phase === 'instructions') return `<h2>Get ready</h2>${ui.brief(`${whole(D0)} of new deposits from the Fed's purchase, and ${whole(D0)} of new reserves.`, `each step, how much of your new deposits to lend: up to ${100 - s.rr}% of them; the rest stays as reserves.`, 'your loans are spent and deposited at other banks, which may send deposits your way. Your profit counts loan income and interest on reserves.')}
+      <details open><summary>Worked example: one step</summary><p class="note" style="margin:6px 0 0">You receive $1,000 of deposits with $1,000 of reserves. You must keep ${whole(D0 * s.rr / 100)}. Lend ${whole(D0 * (1 - s.rr / 100))}: your borrower keeps ${whole(D0 * (1 - s.rr / 100) * s.drain / 100)} as cash and spends ${whole(D0 * (1 - s.rr / 100) * (1 - s.drain / 100))}, which becomes new deposits at other banks. Money in the economy is now $1,000 + ${whole(D0 * (1 - s.rr / 100))} = ${whole(D0 * (2 - s.rr / 100))}, though the base is still $1,000.</p></details>`;
+    const book = ui.tiles([['Your loans', whole(p.loans || 0)], ['Your reserves', whole(p.res || 0)]], 'two') + (S.phase === 'open' && S.step === 1 && !(p.loans || p.res) ? '' : tAccount(p));
     if (S.phase === 'open') {
       if (S.pending) return '<h2>Moving the deposits…</h2>' + book;
       const dep = p.dep || 0, max = p.maxLend || 0, mine = me.moves[String(S.step)];
@@ -140,8 +149,21 @@
     return d.players.filter(p => d.private[p.id]).map(p => ({ round: h.roundNo, label: h.label, iorb: h.settings.iorb, display_name: p.name, loans: d.private[p.id].loans, reserves: d.private[p.id].res, profit: d.private[p.id].income, lends: d.moves.filter(m => m.player === p.id).map(m => `${m.step}:${m.data.lend}`).join(' ') }));
   }
   const steps = s => clean(s || {}).steps;
+  function debrief(S, hh) {
+    const r = hh.result, s = clean(hh.settings);
+    return {
+      explain: `The base was ${whole(r.B)}; after ${r.steps} steps money was ${whole(r.M)}, so the observed multiplier is ${r.mult.toFixed(2)}. Banks lent ${pct(r.lendShare)} of what they could, with loans netting about ${netLoan(s).toFixed(1)}% and reserves paying ${s.iorb}%. Explain the chain from one bank's choice to the class's multiplier, and why it stops short of 1/rr = ${r.textbook.toFixed(0)}.`,
+      transfer: 'In 2008–14 the Fed more than quadrupled the monetary base, yet broad money grew far less, and the money multiplier fell from about 9 to under 3. Using this game, what were banks choosing to do? Since 2020 the U.S. reserve requirement has been zero. What limits bank lending now, if not reserves?',
+      check: { q: 'The required reserve ratio is 10%, the public holds no cash, and banks lend every dollar of excess reserves. The Fed buys $1,000 of bonds from the public. What is the most that deposits can rise, and what is the condition?',
+        options: [['a', '$10,000, if banks keep lending all their excess reserves and no one holds cash'], ['b', '$10,000, always, because the multiplier is 1/rr'], ['c', '$1,000: only the seller\'s deposit'], ['d', '$100,000']], answer: 'a',
+        why: 'The first deposit is $1,000 and each round is 90% of the last: $1,000 ÷ 0.10 = $10,000. That is a ceiling that needs every bank to lend every spare dollar and no one to hold cash. In the game, banks chose to hold reserves when reserves paid more, and borrowers kept cash, so money grew far less.',
+        trap: 'treating 1/rr as a law. It is a limit under conditions; in practice banks lend when it pays, given loan demand, capital, and funding costs.' }
+    };
+  }
   const game = { id: 'multiplier', title: 'Money Multiplier', tagline: 'Every student is a bank. Lend out deposits and watch the money supply grow, or hold reserves and watch it stall.',
-    fields, presets, buildSettings, rules, steps, assign, afterStep, resolve, renderProjector, renderStudent, wireStudent, renderInstructor, sim, exportRows,
+    fields, presets, buildSettings, rules, steps, assign, afterStep, resolve, renderProjector, renderStudent, wireStudent, renderInstructor, sim, exportRows, debrief,
+    nonresponse: 'the bank lends nothing this step and keeps all its new deposits as reserves.',
+    compare: { metric: 'the multiplier after the last step', note: 'Every bank starts with the same $1,000 each round, but deposits travel to randomly picked banks, and banks have seen the last round.' },
     openLabel: 'Open step 1', stepLabel: S => `End step ${S.step}; move the deposits`, closeLabel: S => S.step >= steps(S.settings) ? 'End the last step' : 'End lending now' };
   window.CLASSROOM_GAME = game;
   if (!window.CLASSROOM_NO_START) window.Classroom.start(game);

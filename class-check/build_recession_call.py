@@ -69,6 +69,7 @@ for d, letter, note in DATES:
     })
 
 out = {"id": "recession-call", "title": "Recession Call", "revote": False,
+       "keyNote": "One outcome cannot show whether a probability was right: a 30% call should be followed by a recession about 3 times in 10. Judge forecasts by the Brier score over the whole set, against the 0.25 you get by always saying 50%. Recessions are dated by the NBER, often many months after they begin, and the spreads are monthly averages as published today. Nearby dates have overlapping 12-month windows, so six dates are less evidence than they look.",
        "note": "Mar 16, after 10.1-10.3. Six mystery dates; each shows the term spread and the credit spread for the three years before. "
                f"Students give a probability; scored with the Brier score. Built {date.today()} from FRED by build_recession_call.py.",
        "questions": questions}

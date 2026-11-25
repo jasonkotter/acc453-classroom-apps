@@ -5,8 +5,11 @@ The older single-player explainer is in `../money-multiplier/`.
 
 ## Rules
 
-- The Fed buys bonds; the sellers deposit **$1,000 at every bank**. The monetary base is
-  $1,000 × the number of banks.
+- The Fed buys bonds from the public; the sellers deposit **$1,000 at every bank**, and the Fed
+  pays each seller's bank $1,000 of reserves. So every bank starts with $1,000 of new deposits and
+  $1,000 of new reserves, and the monetary base rises by $1,000 × the number of banks. (The
+  individual lab in `../money-multiplier/` uses a Fed purchase *from a bank* instead: reserves rise
+  first, and deposits only with the first loan. Both reach the same limit, new reserves ÷ rr.)
 - Each step (5 by default), every bank sees its **new deposits** and chooses how much to lend:
   from $0 to new deposits × (1 − required reserve ratio). The rest stays as reserves. No answer
   means it all stays as reserves. The server rejects loans above the limit.
@@ -26,9 +29,16 @@ The older single-player explainer is in `../money-multiplier/`.
 1. **Textbook banking:** rr 10%, cash 10%, loans 6% with 1% losses (about 4.9% net), reserves 0%.
    Lending pays. Demo (40 simulated banks): lent 92%, multiplier 3.33 after five steps,
    heading to 4.3.
-2. **Interest on reserves, riskier loans:** reserves pay 4.5%; loans 6% with 2% losses (about
-   3.9% net). Holding reserves pays more. Demo: lent 6%, multiplier 1.05, extra reserves $35,585
-   of $40,000.
+2. **Interest on reserves (one change):** the same loans as round 1 (about 4.9% net); reserves pay
+   5.4%, as in 2023–24. Only one setting differs from round 1, so the comparison isolates interest
+   on reserves. Added 2026-11-25 after the teaching review; not yet rehearsed.
+3. **Interest on reserves and riskier loans (two changes, optional):** reserves pay 4.5%; loans 6%
+   with 2% losses (about 3.9% net). Holding reserves pays more. Demo: lent 6%, multiplier 1.05,
+   extra reserves $35,585 of $40,000. Two settings change at once, so a comparison with round 1
+   cannot say which mattered.
+
+The projector separates the **observed** multiplier (money ÷ base after the steps played) from
+the **extrapolated** limit (what it would reach if banks kept lending the same share forever).
 
 ## Run (about 15 minutes)
 

@@ -126,7 +126,8 @@
       <li>You run a bank: <b>$100 of one-year loans</b>, funded by $${DEP} of deposits at ${DEP_RATE}% and <b>$${s.eq0} of equity</b>. Each year you choose what share of your loans goes to <b>risky borrowers</b>${s.cap < 100 ? ` (the regulator caps it at <b>${s.cap}%</b>)` : ''}.</li>
       <li><b>Safe loans</b> pay ${SAFE_RATE}% and ${SAFE_DEF}% of them default. <b>Risky loans</b> pay ${RISKY_RATE}%; how many default depends on <b>everyone's</b> lending. A default loses ${LGD * 100}% of the loan.</li>
       <li><b>The rule:</b> risky default rate = ${BASE}%${s.boom ? ` <b>+ ${s.boom}</b> points for every 10 points that <b>last year's</b> class-average risky share was above ${NORM}%` : ''}${s.refi ? ` <b>− ${s.refi}</b> for every 10 points that <b>this year's</b> is above ${NORM}%` : ''} (never below 1%). Easy credit lets weak borrowers refinance now and default later.</li>
-      <li>Also set your <b>allowance</b>: the share of your loans you expect to charge off this year. After the last year, every bank's loans <b>roll over once more</b> unchanged. Equity below zero: <b>your bank fails</b>.</li></ul>`;
+      <li>Also set your <b>allowance</b>: the share of your loans you expect to charge off this year. It is an estimate: it does not change your losses or your equity, and it is compared with what you actually charge off. After the last year, every bank's loans <b>roll over once more</b> unchanged. Equity below zero: <b>your bank fails</b>.</li>
+      <li class="note">The default rule is built for this game, with its one-year lag chosen to show a credit cycle; it is not an estimate of real default rates.</li></ul>`;
   }
   function chart(S, s) {
     const path = S.pub.path || [];
@@ -168,8 +169,9 @@
   }
   function ratios(x) {
     return ui.table(['Ratio', 'Your bank'], [
-      ['Delinquency (non-current ÷ loans)', p1(x.noncur)], ['Net charge-offs ÷ loans', p1(x.nco)],
-      ['Loan loss reserve (allowance ÷ loans)', p1(x.a)], ['NPL coverage (allowance ÷ non-current)', pct(x.noncur ? x.a / x.noncur : null)]]);
+      ['Delinquency (non-current ÷ loans)', p1(x.noncur)], ['Net charge-offs ÷ loans (60% of non-current)', p1(x.nco)],
+      ['Loan loss reserve (allowance ÷ loans)', p1(x.a)], ['NPL coverage (allowance ÷ non-current)', pct(x.noncur ? x.a / x.noncur : null)]]) +
+      '<p class="note" style="margin-top:4px">Simplified: here every loan that stops paying defaults in the same year. Real delinquency counts loans 30 or more days late, and some of them recover. Real allowances under CECL cover expected losses over a loan\'s whole life, not one year.</p>';
   }
   function lastYear(p) {
     const x = p.last; if (!x) return '';
@@ -177,7 +179,9 @@
   }
   function renderStudent(S, me) {
     const s = clean(S.settings), p = me.priv[S.roundNo] || {}, path = S.pub.path || [], last = path[path.length - 1];
-    if (S.phase === 'instructions') return `<h2>Get ready</h2><p class="sub">You start with $100 of loans and $${s.eq0} of equity. Each year: what share of your loans goes to risky borrowers, and how much do you expect to lose?</p>`;
+    if (S.phase === 'instructions') { const y = year(NORM, BASE);
+      return `<h2>Get ready</h2>${ui.brief(`a bank with $100 of loans, $${DEP} of deposits, and $${s.eq0} of equity.`, `each year, the risky share of your loans${s.cap < 100 ? ` (at most ${s.cap}%)` : ''} and your allowance: the share of loans you expect to charge off.`, 'the class\'s lending sets the risky default rate by the published rule; your equity grows with income and shrinks with losses.')}
+      <details open><summary>Worked example: one year</summary><p class="note" style="margin:6px 0 0">Lend ${NORM}% risky when risky loans default at ${BASE}%. Loans that stop paying: 70% × ${SAFE_DEF}% + 30% × ${BASE}% = ${p1(y.noncur)} of loans. You lose ${LGD * 100}% of those: net charge-offs ${p1(y.nco)}. Interest earned: 70% × ${SAFE_RATE}% + 30% × ${RISKY_RATE}% = ${p1(y.interest)}. Less $${(DEP * DEP_RATE / 100).toFixed(2)} of deposit interest, income is ${money(y.income, 2)}, so equity goes from ${money(s.eq0, 2)} to ${money(s.eq0 + y.income, 2)}. An allowance of about ${p1(y.nco)} would have matched the losses.</p></details>`; }
     if (S.phase === 'open') {
       if (S.pending) return '<h2>Counting the year\'s losses…</h2>';
       if (p.failed) return `<h2>✖ Your bank failed</h2><p class="sub">Its equity fell below zero in year ${p.failYear}.</p>${lastYear(p)}`;
@@ -222,8 +226,23 @@
         choices: d.moves.filter(m => m.player === p.id).sort((a, b) => a.step - b.step).map(m => `${m.step}:${m.data.risky}/${m.data.allow}`).join(' '),
         final_equity: x.eq != null ? x.eq.toFixed(2) : '', failed: x.failed ? 1 : 0, fail_year: x.failYear ?? '' }; });
   }
+  function debrief(S, hh) {
+    const r = hh.result, s = clean(hh.settings), b = r.best;
+    const extra = s.cap < 100 ? ` The cap held risky lending to ${s.cap}%. Who gained from it, who lost, and what does it leave out?` : s.recYear ? ` The recession hit in year ${s.recYear}. Which banks survived it, and what did they do in the years before?` : '';
+    return {
+      explain: `The class lent ${p1(r.meanR)} of its loans to risky borrowers on average; the risky default rate peaked at ${p1(r.peakD)}, and ${r.failed} of ${r.n} banks failed. Had every bank lent ${b.R}% every year, each would have ended with ${money(b.eq, 2)}. Use the year table: which year's lending showed up in which year's defaults? Why did each bank lend more than was good for the class?${extra}`,
+      transfer: 'Before 2008 many banks\' allowances were low while they made riskier mortgages, because recent charge-offs were low. Using the lag in this game, explain why an allowance based on recent losses can be smallest just before losses arrive. Who benefits when banks lend in a boom, and who pays later?',
+      check: { q: 'A bank has $100 of loans: 70% safe loans that default at 1%, and 30% risky loans that default at 5%. It loses 60% of a defaulted loan. What are its net charge-offs, as a share of loans?',
+        options: [['a', 'About 1.3%'], ['b', '2.2%'], ['c', '5%'], ['d', '3%']], answer: 'a',
+        why: 'Loans that stop paying: 0.7 × 1% + 0.3 × 5% = 2.2%. Losing 60% of each: 0.6 × 2.2% = 1.32%. An allowance near 1.3% matches those losses. Setting a bigger allowance would not change the losses; it only sets more aside for them.',
+        trap: 'confusing loans that stop paying (2.2%) with the losses on them (1.3%), or thinking a bigger allowance reduces losses.' }
+    };
+  }
+
   const game = { id: 'loanofficer', title: 'Loan Officer', tagline: 'Every bank chooses how much to lend to risky borrowers. Together, the class sets the default rate.',
     fields, presets, buildSettings, rules, steps, assign, afterStep, resolve, renderProjector, renderStudent, wireStudent, renderInstructor, sim, exportRows,
+    debrief, nonresponse: 'the bank repeats last year\'s choices (year 1: 30% risky and a 3% allowance).',
+    compare: { metric: 'the number of banks that fail', note: 'Every round uses the same rule and the same starting balance sheets, and the cap and recession rounds each change one thing. Banks have also learned from earlier rounds.' },
     openLabel: 'Open year 1', stepLabel: S => `End year ${S.step}; count losses`, closeLabel: S => S.step >= steps(S.settings) ? 'End the last year' : 'End lending now', model: { simulate, defRate, year, bestUniform } };
   window.CLASSROOM_GAME = game;
   if (!window.CLASSROOM_NO_START) window.Classroom.start(game);

@@ -67,9 +67,11 @@
       private: priv,
       result: { n: ids.length, cans: pub.cans, sold: c.sold, price: c.price, nBids: c.nBids, M: pub.M, spend, V: pub.M ? spend / pub.M : null,
         hist, cutoffBid: c.cutoffBid, cashMedian: ui.median(cashes),
-        pred: preds.length ? { n: preds.length, median: ui.median(preds), mean: ui.mean(preds), close: c.price ? preds.filter(x => Math.abs(x - c.price) <= Math.max(1, 0.2 * c.price)).length : 0 } : null }
+        pred: preds.length ? { n: preds.length, median: ui.median(preds), mean: ui.mean(preds), lo: quart(preds, .25), hi: quart(preds, .75), close: c.price ? preds.filter(x => Math.abs(x - c.price) <= Math.max(1, 0.2 * c.price)).length : 0 } : null }
     };
   }
+
+  const quart = (a, q) => { const b = [...a].sort((x, y) => x - y), i = (b.length - 1) * q, lo = Math.floor(i); return b[lo] + (b[Math.min(lo + 1, b.length - 1)] - b[lo]) * (i - lo); };
 
   /* ---------- shared pieces ---------- */
   function comparison(S) {
@@ -77,8 +79,9 @@
     if (!done.length) return '';
     const p0 = done[0].result.price;
     return `<h3>Round comparison: M × V = P × Y</h3>` + ui.table(
-      ['Round', 'Money in the room (M)', 'Cans sold (Y)', 'Price (P)', 'Spending (P × Y)', 'Spent ÷ money (V)', 'Price vs round 1'],
-      done.map(h => { const r = h.result; return [`${h.roundNo}. ${esc(h.label)}`, whole(r.M), r.sold, `<b>${money(r.price)}</b>`, whole(r.spend), r.V != null ? r.V.toFixed(2) : '—', p0 ? (r.price / p0).toFixed(2) + '×' : '—']; }));
+      ['Round', 'Bids / bidders', 'Money in the room (M)', 'Cans sold (Y)', 'Price (P)', 'Spending (P × Y)', 'Spent ÷ money (V)', 'Price vs round 1'],
+      done.map(h => { const r = h.result; return [`${h.roundNo}. ${esc(h.label)}`, `${r.nBids} / ${r.n}`, whole(r.M), r.sold, `<b>${money(r.price)}</b>`, whole(r.spend), r.V != null ? r.V.toFixed(2) : '—', p0 ? (r.price / p0).toFixed(2) + '×' : '—']; })) +
+      `<p class="note">V is spending ÷ money in this one auction, not the economy's velocity. M × V = P × Y holds by definition once V is measured this way; the prediction that P moves with M needs V and Y to stay put. Here two built-in assumptions keep V steady: budgets fall in a fixed rich-to-poor pattern, and unspent cash is worthless.</p>`;
   }
   function histogram(r) {
     const bins = r.hist.map(b => ({ label: b.lo === b.hi ? '$' + b.lo : `$${b.lo}–${b.hi}`, mark: r.price >= b.lo && r.price <= b.hi ? '▲ price' : '',
@@ -99,10 +102,11 @@
         ${ctx.joinLine()}${comparison(S)}`;
     const h = S.history.find(x => x.roundNo === S.roundNo); if (!h) return head + '<p>Waiting for results.</p>';
     const r = h.result;
-    const pred = r.pred ? `<p class="sub">The class predicted ${money(r.pred.median)} (median of ${r.pred.n}); ${r.pred.close} came within 20%.</p>` : '';
+    const pred = r.pred ? `<p class="sub">The class predicted ${money(r.pred.median)} (median of ${r.pred.n}; the middle half said ${money(Math.round(r.pred.lo))} to ${money(Math.round(r.pred.hi))}); ${r.pred.close} came within 20%.</p>` : '';
     return `${head}<div class="split"><div>
         <div class="label">The market price</div><div class="lead">${r.price != null ? money(r.price) : 'No sale'}</div>${pred}
         ${ui.tiles([['Cans sold (Y)', `${r.sold} of ${r.cans}`], ['Money in the room (M)', whole(r.M)], ['Spending (P × Y)', whole(r.spend)], ['Bids', `${r.nBids} of ${r.n}`]])}
+        ${r.price != null && r.sold >= r.cans ? `<p class="sub"><b>Where the price came from:</b> it is the highest bid that did not win, ${money(r.price)}. The bidder who just missed out sets it, not the typical budget.</p>` : ''}
         <p class="note">Half the class started with ${money(r.cashMedian)} or less. Unspent cash, ${whole(r.M - r.spend)}, is now worth nothing.</p>
       </div><div><h3 style="margin-top:0">Every bid</h3>${histogram(r)}</div></div>${comparison(S)}`;
   }
@@ -110,7 +114,8 @@
   /* ---------- student ---------- */
   function renderStudent(S, me, ctx) {
     const s = A.clean(S.settings), rn = S.roundNo, priv = me.priv[rn] || {}, mv = me.moves['1'];
-    if (S.phase === 'instructions') return `<h2>Get ready</h2><p class="sub">Read the rules. Your cash appears when bidding opens.</p>`;
+    if (S.phase === 'instructions') return `<h2>Get ready</h2>${ui.brief('a private cash budget. You see it when bidding opens. It is good only in this auction.', `${s.predict ? 'a prediction of the market price, then ' : ''}one sealed bid in whole dollars, up to your cash, or no bid.`, `the cans (enough for about ${s.cansPct}% of the class) go to the highest bids, and every winner pays the same price: the highest bid that did not win. Cash you do not spend is worth nothing.`)}
+      <details open><summary>Worked example</summary><p class="note" style="margin:6px 0 0">Three cans and five bids: $40, $30, $25, $20, and $10. The three highest bids win. Each winner pays $20, the highest bid that did not win. The $10 bidder keeps cash that is now worth nothing.</p></details>`;
     if (S.phase === 'open') {
       const got = mv ? (mv.bid != null ? `Your bid of <b>${money(mv.bid)}</b> is in.` : 'You chose <b>no bid</b>.') + (mv.predict != null ? ` Your prediction: ${money(mv.predict)}.` : '') + ' You can change it until bidding closes.' : '';
       return `<h2>Place your sealed bid</h2>
@@ -161,10 +166,33 @@
     return d.players.filter(p => d.private[p.id]).map(p => ({ round: h.roundNo, label: h.label, money_mult: h.settings.moneyMult, cans: r.cans, price: r.price, money_in_room: r.M, display_name: p.name, cash: d.private[p.id].cash, bid: last[p.id] ? last[p.id].bid ?? '' : '', prediction: last[p.id] ? last[p.id].predict ?? '' : '', won: !!d.private[p.id].won, paid: d.private[p.id].paid || 0 }));
   }
 
+  /* ---------- debrief ---------- */
+  const CHECKS = [
+    { q: 'In an economy, the amount of money doubles and real output stays the same. Using M × V = P × Y, what happens to the price level?',
+      options: [['a', 'It doubles, if velocity stays the same'], ['b', 'It doubles, because the equation guarantees it'], ['c', 'Nothing: the equation always balances'], ['d', 'It halves']], answer: 'a',
+      why: 'With V and Y fixed, P must double to keep M × V equal to P × Y. The equation is true by definition once V is measured as spending ÷ money; the prediction comes from assuming V and Y stay put.',
+      trap: 'treating the equation itself as the theory. If people hold on to the new money (V falls) or output grows, prices need not double.' },
+    { q: 'Money doubles and output doubles too, and people spend money as fast as before. What happens to the price level?',
+      options: [['a', 'It stays about the same'], ['b', 'It doubles'], ['c', 'It falls by half'], ['d', 'It quadruples']], answer: 'a',
+      why: 'If V is steady, M × V doubles and so does P × Y. With Y doubled, P can stay where it was. Inflation comes from money growing faster than output.',
+      trap: 'thinking any increase in money raises prices. What matters is money relative to the goods it is chasing.' }
+  ];
+  function debrief(S, hh) {
+    const r = hh.result, s = A.clean(hh.settings), first = S.history.find(x => x.result && x.result.price != null);
+    const vs = first && first.roundNo !== hh.roundNo ? ` Round ${first.roundNo}'s price was ${money(first.result.price)}, so this one is ${(r.price / first.result.price).toFixed(2)} times as high.` : '';
+    return {
+      explain: r.price == null ? 'Nothing sold. Why not, and what would it take for a sale?' : `The price was ${money(r.price)}: the highest bid that did not win.${vs} Explain where that price came from, using the money in the room (${whole(r.M)}) and the ${r.sold} cans sold. Why is it far above what half the class started with (${money(r.cashMedian)} or less)?`,
+      transfer: 'Suppose every household got a check worth a month of spending, but stores could not produce any more goods. What happens to prices? What changes if people save the checks instead, so that unspent money keeps its value?',
+      check: CHECKS[(s.cansPct > 10 && s.moneyMult > 1) ? 1 : 0]
+    };
+  }
+
   const game = {
     id: 'auction', title: 'Inflation Auction', tagline: 'One good. Limited supply. Sealed bids. See what happens to the price when the money changes, and when the goods do.',
     fields, presets, buildSettings, rules, assign, resolve, renderProjector, renderStudent, wireStudent, renderInstructor, sim, exportRows,
-    openLabel: 'Open bidding', closeLabel: () => 'Close bidding'
+    openLabel: 'Open bidding', closeLabel: () => 'Close bidding', debrief,
+    nonresponse: 'no bid: no can, and their cash stays unspent (it counts in M but not in spending, so it lowers V).',
+    compare: { metric: 'the market price', note: 'Each student keeps the same budget rank, but who bids, and how far below their cash, can change; a few large budgets set the price.' }
   };
   window.CLASSROOM_GAME = game;
   if (!window.CLASSROOM_NO_START) window.Classroom.start(game);

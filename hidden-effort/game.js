@@ -114,9 +114,10 @@
       `<div class="legend"><span><i class="sw" style="background:${C.work}"></i>Worked</span><span><i class="sw" style="background:${C.slack}"></i>Slacked</span>${r.monitor ? `<span><i class="sw" style="background:${C.called}"></i>Caught slacking</span>` : ''}<span><i class="sw" style="background:${C.decline}"></i>Declined</span><span>By the rate the lender charged</span></div>`;
   }
   function theory(r) {
-    return r.collateral ? `With $${r.collateral} at stake, working beats slacking at ${r.cap >= MAXRATE ? 'every allowed rate' : `rates up to ${r.cap}%`}.`
-      : r.monitor ? `Unmonitored, working beats slacking only up to ${r.cap}%; a monitored borrower should work up to ${r.capMon}%.`
-      : `Working beats slacking for a borrower only at rates up to <b>${r.cap}%</b>. Above that, a higher rate makes slacking pay.`;
+    return (r.collateral ? `With $${r.collateral} at stake, working pays a borrower at least as well as slacking at ${r.cap >= MAXRATE ? 'every allowed rate' : `rates up to ${r.cap}%`}.`
+      : r.monitor ? `Unmonitored, working pays at least as well as slacking only up to ${r.cap}%; a monitored borrower should work up to ${r.capMon}%.`
+      : `Working pays a borrower at least as well as slacking only at rates up to <b>${r.cap}%</b> (at about ${r.cap}% the two are a tie). Above that, a higher rate makes slacking pay.`) +
+      ' That cutoff comes from this game\'s numbers: it shows one way a higher rate can backfire, not a law about every loan.';
   }
   function comparison(S) {
     const done = S.history.filter(h => h.result && h.result.pairs != null); if (!done.length) return '';
@@ -138,6 +139,13 @@
       <p class="note">${theory(r)} If every borrower worked, each loan would create $${(P_WORK * PAYOFF - EFFORT - LOAN).toFixed(0)}.</p></div>
       <div>${rateChart(r)}</div></div>${comparison(S)}`;
   }
+  /* For the lender, before setting terms: what each choice is worth, on average, at a few rates. */
+  function lenderTable(s, mon) {
+    const ev = (r, c, who) => outcome(s, r, c, mon, 0.5)[who];
+    return `<details open><summary>What each choice is worth, on average</summary>${ui.table(['Rate', 'Borrower expects if they work', 'if they slack', 'You expect if they work', 'if they slack'],
+      [10, 20, 30, 40, 50].map(r => [r + '%', m2(ev(r, 'work', 'expB')), m2(ev(r, 'slack', 'expB')), m2(ev(r, 'work', 'expL')), m2(ev(r, 'slack', 'expL'))]))}
+      <p class="note" style="margin-top:4px">Averages over many loans, after the borrower's $${EFFORT} effort cost${mon ? ` and your $${s.monCost} monitoring cost` : ''}. A borrower whose project fails repays nothing${s.collateral ? ` beyond the $${s.collateral} of collateral` : ''}. Which rates make working the better deal for your borrower?</p></details>`;
+  }
   function payoffLines(s, rate, mon) {
     const R = LOAN * (1 + rate / 100);
     return ui.table(['If you…', 'Project succeeds', 'Project fails'], [
@@ -147,7 +155,7 @@
   }
   function renderStudent(S, me) {
     const s = clean(S.settings), p = me.priv[S.roundNo] || {};
-    if (S.phase === 'instructions') return '<h2>Get ready</h2><p class="sub">You will be a lender or a borrower; your role appears when the round opens.</p>';
+    if (S.phase === 'instructions') return `<h2>Get ready</h2>${ui.brief('a role, lender or borrower, shown when the round opens.', `lenders set an interest rate${s.monitor ? ' and decide whether to monitor' : ''}; then borrowers see it and choose to work, slack, or decline. Everyone makes a guess first.`, 'one draw of luck decides whether each project succeeds. Lenders never see whether their borrower worked.')}`;
     if (p.role === 'spare') return '<h2>You are the watcher this round</h2><p class="sub">The class has an odd number, so you sit this one out. Watch the screen: which rates get effort?</p>';
     const mine = me.moves[String(S.step)], lender = p.role === 'lender';
     const who = lender ? '<div class="banner"><strong>You are a lender.</strong>You lend $100. You will not see whether your borrower works.</div>'
@@ -157,7 +165,7 @@
       if (S.step === 1) {
         const guess = `<div class="field"><label for="hGuess">${lender ? 'Guess: what % of borrowers will slack?' : 'Guess: the average rate lenders will charge (%)'}</label><input id="hGuess" type="number" min="0" max="100" inputmode="numeric" value="${mine && mine.guess != null ? mine.guess : ''}"></div>`;
         if (!lender) return who + `<p class="sub">Your lender is setting the terms.</p><div class="row">${guess}<button class="btn primary" id="hSend">Submit</button></div><p class="msg good" id="receipt">${mine ? 'Guess in.' : ''}</p>`;
-        return who + `<p class="note">Your borrower repays $100 plus interest if the project succeeds: ${P_WORK * 100}% of the time if they work, ${P_SLACK * 100}% if they slack. If it fails you get ${s.collateral ? `their $${s.collateral} of collateral` : 'nothing'}.</p>
+        return who + `<p class="note">Your borrower repays $100 plus interest if the project succeeds: ${P_WORK * 100}% of the time if they work, ${P_SLACK * 100}% if they slack. If it fails you get ${s.collateral ? `their $${s.collateral} of collateral` : 'nothing'}.</p>${lenderTable(s, false)}
           <div class="row"><div class="field"><label for="hRate">Interest rate (0–${MAXRATE}%)</label><input id="hRate" type="number" min="0" max="${MAXRATE}" inputmode="numeric" value="${mine && mine.rate != null ? mine.rate : ''}"></div>${guess}</div>
           ${s.monitor ? `<label class="check"><input type="checkbox" id="hMon" ${mine && mine.monitor ? 'checked' : ''}> Pay $${s.monCost} to monitor my borrower</label>` : ''}
           <button class="btn primary" id="hSend">Submit</button><p class="msg good" id="receipt">${mine && mine.rate != null ? `Terms in: ${mine.rate}%${mine.monitor ? ', monitored' : ''}. You can change them until the step ends.` : ''}</p>`;
@@ -208,8 +216,24 @@
         success: x.success == null ? '' : x.success ? 1 : 0, gain: x.gain ?? '', expected_gain: x.exp != null ? x.exp.toFixed(2) : '',
         guess: (d.moves.find(m => m.player === p.id && m.step === 1) || { data: {} }).data.guess ?? '' }; });
   }
+  function debrief(S, hh) {
+    const r = hh.result, rate = r.avgRate != null ? r.avgRate.toFixed(0) + '%' : '—';
+    const extra = r.monitor ? ` ${r.monitored} of ${r.offered} lenders paid to monitor. Who bore that cost, and was it worth it?` : r.collateral ? ` Why did $${r.collateral} of collateral change the borrower's choice? Who could not afford to post it?` : '';
+    return {
+      explain: `${pct(r.slackShare)} of the ${r.loans} borrowers who took a loan slacked; the average rate was ${rate}. Use the chart by rate: where did slacking start to pay, and why does a higher rate push a borrower toward it? Compare a lender's expected gain (${m2(r.avgL)}) with what lenders actually got: how much was luck?${extra}`,
+      transfer: 'A lender raises the rate on risky small-business loans to cover expected losses. Using this game, explain how that could raise its losses instead. What could it do instead of raising the rate, and what does each option cost?',
+      check: { q: 'A project pays $160 if it succeeds. Working costs the borrower $10 and succeeds 90% of the time; slacking is free and succeeds 50%. A borrower whose project fails repays nothing. At a 50% rate (repay $150), what does the borrower prefer?',
+        options: [['a', 'Slack'], ['b', 'Work'], ['c', 'They are indifferent']], answer: 'a',
+        why: 'Working: 0.9 × ($160 − $150) − $10 = −$1. Slacking: 0.5 × ($160 − $150) = $5. The borrower keeps only what is left after repaying and pays nothing on failure, so a high rate shrinks the reward for effort without shrinking its cost. With these numbers, working stops paying above 35%.',
+        trap: 'thinking a higher rate simply pays the lender for more risk. Here it changes the risk by changing what the borrower does. That is one mechanism behind credit rationing; adverse selection is another.' }
+    };
+  }
+
   const game = { id: 'hidden-effort', title: 'Hidden Effort', tagline: 'Lend $100 to a classmate whose effort you cannot see. What does the interest rate do to their choice?',
     fields, presets, buildSettings, steps, rules, assign, afterStep, resolve, renderProjector, renderStudent, wireStudent, renderInstructor, sim, exportRows,
+    debrief, nonresponse: 'a lender with no rate makes no loan, and a borrower who does not answer declines the loan.',
+    expected: S => S.step === 1 ? 2 * (S.pub.pairs || 0) : null,
+    compare: { metric: 'the share of borrowers who slack', note: 'Each round has new partners and new luck, and lenders have learned which rates got effort, so a gap mixes the rule change with learning.' },
     openLabel: 'Open: lenders set terms', stepLabel: () => 'End terms; send them to borrowers', closeLabel: () => 'Close the round', model: { outcome, workCap } };
   window.CLASSROOM_GAME = game;
   if (!window.CLASSROOM_NO_START) window.Classroom.start(game);

@@ -91,13 +91,15 @@
     const h = S.history.find(x => x.roundNo === S.roundNo); if (!h) return head;
     const r = h.result;
     return `${head}<div class="split"><div><div class="label">Cars sold</div><div class="lead">${r.trades} of ${r.pairs}</div>
-      ${ui.tiles([['Average price', whole(r.avgPrice)], ['Average quality sold', r.avgValueSold ? whole(r.avgValueSold) : '—'], ['Gains from trade realized', pct((r.gains - r.inspectCost) / Math.max(1, r.possible))], ['Offers made', `${r.offers} of ${r.pairs}`]])}
+      ${ui.tiles([['Average price', whole(r.avgPrice)], ['Average quality sold', r.avgValueSold ? whole(r.avgValueSold) : '—'], [r.inspectCost ? `Gains from trade realized, after ${whole(r.inspectCost)} spent on inspections` : 'Gains from trade realized', pct((r.gains - r.inspectCost) / Math.max(1, r.possible))], ['Offers made', `${r.offers} of ${r.pairs}`]])}
       <p class="note">Every car was worth more to a buyer than to its seller, so every unsold car is a trade that should have happened.</p></div>
       <div>${gradeChart(r)}</div></div>${comparison(S)}`;
   }
   function renderStudent(S, me) {
     const s = clean(S.settings), p = me.priv[S.roundNo] || {};
-    if (S.phase === 'instructions') return '<h2>Get ready</h2><p class="sub">Your role and your car (if you are selling) appear when the market opens.</p>';
+    if (S.phase === 'instructions') return `<h2>Get ready</h2>${ui.brief('a role, seller or buyer, shown when the market opens. A seller also learns the car\'s quality.', `${s.inspect ? 'sellers first decide whether to pay for an inspection; then ' : ''}buyers make one offer, and sellers accept or reject it.`, 'gains are counted: seller gain = price − value to seller; buyer gain = value to buyer − price.')}
+      <details open><summary>Worked examples</summary><p class="note" style="margin:6px 0 0"><b>Seller:</b> your car is Good, worth $8,000 to you. An offer of $7,000 would lose you $1,000, so you reject it; $9,000 gains you $1,000.<br>
+      <b>Buyer:</b> if every quality were equally likely to be sold, the average car would be worth $6,000 to its seller and $9,000 to you. But ask which sellers would actually accept your offer: those are the cars you would get.</p></details>`;
     if (p.role === 'spare') return '<h2>You are the market watcher this round</h2><p class="sub">The class has an odd number, so you sit this one out. Watch the screen: what quality of car is selling?</p>';
     const mine = me.moves[String(S.step)], st = S.phase === 'open' && !S.pending ? stage(s, S.step) : null;
     const who = p.role === 'seller' ? `<div class="banner"><strong>You are a seller.</strong>Your car is <b>${GRADES[p.grade][0]}</b>: worth ${whole(p.value)} to you and ${whole(p.value * MULT)} to a buyer. Only you know this.</div>`
@@ -132,8 +134,24 @@
   function exportRows(h, d) {
     return d.players.filter(p => d.private[p.id]).map(p => { const x = d.private[p.id]; return { round: h.roundNo, label: h.label, display_name: p.name, role: x.role, grade: x.grade != null ? GRADES[x.grade][0] : '', inspected: x.inspected ?? '', offer: x.offered ?? x.offer ?? '', sold_or_bought: x.sold ?? x.bought ?? '', price: x.price ?? '', gain: x.gain ?? '' }; });
   }
+  function debrief(S, hh) {
+    const r = hh.result, s = clean(hh.settings), nIns = r.byGrade.reduce((t, g) => t + g.inspected, 0);
+    const good = r.byGrade.slice(3).reduce((t, g) => t + g.cars, 0), goodSold = r.byGrade.slice(3).reduce((t, g) => t + g.sold, 0);
+    return {
+      explain: `${r.trades} of ${r.pairs} cars sold${r.avgPrice != null ? ` at an average price of ${whole(r.avgPrice)}` : ''}, and ${goodSold} of the ${good} Good or Peach cars sold. ${s.inspect ? `${nIns} sellers paid ${whole(s.inspectCost)} for an inspection. Was choosing <i>not</i> to inspect itself a signal to buyers? Was inspection worth it for every car?` : 'Use the chart by quality: which cars stayed off the market, and how did buyers\' offers drive them away?'}`,
+      transfer: 'A bank cannot tell which borrowers will repay. If it raises the interest rate for everyone, who keeps applying and who walks away? What plays the role of the inspection in lending?',
+      check: { q: 'Buyers cannot see quality, so they all offer $6,000, the average value to sellers across the five qualities. Which sellers accept?',
+        options: [['a', 'Only sellers of Lemon, Rough, and Fair cars'], ['b', 'All sellers, since $6,000 is the average'], ['c', 'Only sellers of Good and Peach cars'], ['d', 'No one']], answer: 'a',
+        why: 'A seller accepts only an offer at or above what the car is worth to her, so the $8,000 and $10,000 cars stay home. The cars that do sell are worth $4,000 to sellers on average, and $6,000 to buyers: exactly what buyers paid. Buyers gain nothing on average, so offers fall and the good cars stay away.',
+        trap: 'pricing to the average car in the market instead of the average car that would actually be sold at that price. That gap is adverse selection.' }
+    };
+  }
+
   const game = { id: 'lemons', title: 'Lemons Market', tagline: 'A used-car market where only sellers know the quality. Watch what happens to the good cars, and what inspection does.',
     fields, presets, buildSettings, steps, rules, assign, afterStep, resolve, renderProjector, renderStudent, wireStudent, renderInstructor, sim, exportRows,
+    debrief, nonresponse: 'a seller who does not choose is not inspected; a buyer with no offer, or a seller with no answer, means no sale.',
+    expected: S => stage(clean(S.settings), S.step) === 'accept' ? null : S.pub.pairs,
+    compare: { metric: 'the average quality of cars sold', note: 'Each round draws new cars and new partners, and buyers have learned from earlier rounds, so a gap mixes the rule change with luck and learning.' },
     openLabel: 'Open the market', stepLabel: S => ({ inspect: 'End inspections; on to offers', offer: 'End offers; send them to sellers' })[stage(clean(S.settings), S.step)] || 'Next step', closeLabel: () => 'Close the market' };
   window.CLASSROOM_GAME = game;
   if (!window.CLASSROOM_NO_START) window.Classroom.start(game);

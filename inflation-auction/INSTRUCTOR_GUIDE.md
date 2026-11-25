@@ -48,6 +48,8 @@ the highest bid that didn't win. Bids are sealed, and you can change yours until
 
 ## Debrief questions (Jan 14)
 
+**On screen.** **Begin debrief** puts three things on the projector and on every phone: an *explain* prompt that quotes this round's numbers, a *transfer* question, and a private exit check (one question on the phone; the reasoning and a common mistake appear after the student answers). Give pairs about two minutes for the first two, then a minute for the exit check. Exit-check answers are not recorded, graded, or timed. When you show the next round, the projector also lists what changed from the last round and what stayed fixed, and asks for a prediction before anyone plays. The questions below go deeper.
+
 - Did doubling the money double the price? Why?
 - What happened when the cans doubled along with the money?
 - Spending divided by money is V. Was it stable across rounds? What would make it change?

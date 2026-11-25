@@ -157,7 +157,7 @@
     const h = S.history.find(x => x.roundNo === S.roundNo); if (!h) return head;
     const r = h.result;
     return `${head}<div class="split"><div><div class="label">Final price ${cents(r.price)}${r.predict != null ? ` · the class predicted ${cents(r.predict)}` : ''}</div><div class="lead">${r.failed} of ${r.n} banks failed</div>
-      ${r.impact ? `<p class="sub">With the <b>same choices and the same withdrawals</b> but no price impact, <b>${r.failedFlat}</b> would have failed. The difference is what banks did to each other.</p>` : '<p class="sub">Sales did not move the price, so every failure came from the bank\'s own withdrawals and choices.</p>'}
+      ${r.impact ? `<p class="sub"><b>Model replay:</b> with the same choices and the same withdrawals but no price impact, <b>${r.failedFlat}</b> would have failed. The gap is what the price spillover did to these choices. Banks might have chosen differently if they had known prices would hold, so it is not proof of what would have happened.</p>` : '<p class="sub">Sales did not move the price, so every failure came from the bank\'s own withdrawals and choices.</p>'}
       ${ui.tiles([['Share of the asset sold', pct(r.soldShare)], ['Of that, beyond what withdrawals needed', pct(r.beyondShare)], ['Forced sales (units)', ui.num(r.forced)], [r.lolr ? 'Borrowed from the central bank' : 'Failed only at market prices', r.lolr ? money(r.loans, 0) : `${r.solvencyFails}`]])}</div>
       <div>${chart(S)}</div></div>${comparison(S)}`;
   }
@@ -169,7 +169,8 @@
   }
   function renderStudent(S, me) {
     const s = clean(S.settings), p = me.priv[S.roundNo] || {};
-    if (S.phase === 'instructions') return `<h2>Get ready</h2><p class="sub">You start with $${CASH0} cash and ${UNITS0} units of the asset at $1.00. Your equity appears when the round opens.</p>`;
+    if (S.phase === 'instructions') return `<h2>Get ready</h2>${ui.brief(`$${CASH0} of cash and ${UNITS0} units of an asset priced at $1.00, funded by deposits and some equity (yours appears when the round opens).`, `each step, after you see your withdrawals: how many units to sell${s.lolr ? ', and how much to borrow from the central bank' : ''}.`, `${s.impact ? 'everyone\'s sales push the price down, and every bank\'s units are marked at the new price' : 'sales do not move the price this round'}. A shortfall is sold for you at a ${s.forced}% discount.`)}
+      <details open><summary>Worked example</summary><p class="note" style="margin:6px 0 0">Your bank has $10 of cash, 90 units at $1.00, and $92 of deposits, so $8 of equity. Depositors withdraw $15, and cash covers $10. Suppose the whole room's selling knocks the price to 95¢: you sell 6 units for $5.70 and pay the rest. You now hold $0.70 of cash and 84 units worth $79.80, against $77 of deposits. Equity is $3.50, down from $8, though you sold only 6 units. Banks that sold nothing take the same markdown on everything they hold.</p></details>`;
     if (S.phase === 'open') {
       if (S.pending) return '<h2>Selling, repricing…</h2>' + sheet(p, s);
       if (p.failed) return `<h2>✖ Your bank failed</h2><p class="sub">It could not pay its depositors in step ${p.failStep}; its remaining units were sold off.</p>`;
@@ -186,7 +187,8 @@
     }
     if (S.phase === 'closed') return '<h2>The crisis is over</h2>' + sheet(p, s);
     return `<h2>${p.dead ? '✖ Your bank failed' : '✔ Your bank survived'}</h2><div class="bigpay">${money(p.eq, 2)}</div><p class="sub">equity at the final price of ${cents(p.price)} (started at ${money(p.eq0, 0)}). You sold ${p.sold} units${p.forcedSold ? ` and ${p.forcedSold} more were sold for you at a discount` : ''}.</p>
-      ${s.impact ? `<p class="note">With the same choices and no price impact: equity ${money(p.eqFlat, 2)}${p.deadFlat ? ', failed' : ''}.</p>` : ''}`;
+      ${ui.table(['Your bank', 'Start', 'End'], [['Cash', money(CASH0, 2), money(p.cash, 2)], ['Asset (units × price)', `${UNITS0} × $1.00 = ${money(UNITS0, 2)}`, `${ui.num(p.units)} × ${cents(p.price)} = ${money(p.units * p.price, 2)}`], ['Deposits', money(CASH0 + UNITS0 - p.eq0, 2), money(p.dep, 2)], ...(s.lolr ? [['Central bank loan, with interest', '$0.00', money(p.loan * (1 + s.rate / 100), 2)]] : []), ['<b>Equity</b>', `<b>${money(p.eq0, 2)}</b>`, `<b>${money(p.eq, 2)}</b>`]])}
+      <p class="note">Of the fall in equity, ${money(p.units * (1 - p.price), 2)} is the markdown on units you still hold: a loss at market prices, not from anything you sold.${s.impact ? ` In the model replay with the same choices and no price impact, your equity would have been ${money(p.eqFlat, 2)}${p.deadFlat ? ' and the bank would still have failed' : ''}.` : ''}</p>`;
   }
   function wireStudent(root, ctx) {
     const send = sell => {
@@ -215,8 +217,23 @@
         choices: d.moves.filter(m => m.player === p.id).map(m => `${m.step}:${m.data.sell}${m.data.borrow ? '+' + m.data.borrow : ''}`).join(' '),
         predict: (d.moves.find(m => m.player === p.id && m.step === 1) || { data: {} }).data.predict ?? '', sold: x.sold ?? '', forced: x.forcedSold ?? '', equity: x.eq != null ? x.eq.toFixed(2) : '', failed: x.dead ? 1 : 0, equity_no_impact: x.eqFlat != null ? x.eqFlat.toFixed(2) : '' }; });
   }
+  function debrief(S, hh) {
+    const r = hh.result, s = clean(hh.settings);
+    return {
+      explain: `${r.failed} of ${r.n} banks failed and the price ended at ${cents(r.price)}${r.predict != null ? ` (the class predicted ${cents(r.predict)})` : ''}. ${r.impact ? `In the replay with no price impact, ${r.failedFlat} would have failed.` : ''} ${pct(r.beyondShare)} of the asset sold went beyond what withdrawals required. Who was hurt by another bank's sales, including banks that sold nothing? Why did selling early look sensible to each bank?`,
+      transfer: s.lolr ? `Here the central bank lent at ${s.lend}% of the asset's pre-crisis value, not its fire-sale price. Who bears the risk if the asset never recovers? Why might a central bank still choose to lend that way in a panic, as the Fed did in 2008 and 2020?`
+        : 'In March 2020 even U.S. Treasuries, the safest asset there is, fell in price as funds and dealers sold at once. Using this game, explain how selling a safe asset can still spread losses. What one rule from the game would you change to stop it?',
+      check: { q: 'Banks A and B hold the same asset. A sells a large amount to pay its depositors, and the price falls 10%. B sells nothing. What happens to B?',
+        options: [['a', 'B\'s equity falls, because its holdings are marked at the lower price'], ['b', 'Nothing: B did not sell'], ['c', 'B gains, because it can now buy the asset cheaply'], ['d', 'B\'s deposits fall by 10%']], answer: 'a',
+        why: 'B\'s holdings are valued at the market price, so it loses 10% of their value without selling anything. If that loss leaves B with thin equity, its depositors may leave and B must sell too, pushing the price down again. That chain is contagion through prices.',
+        trap: 'thinking only the seller is hurt by a fire sale. Everyone holding the same asset takes the markdown.' }
+    };
+  }
+
   const game = { id: 'firesale', title: 'Fire Sale', tagline: 'Every bank holds the same asset. When one sells, everyone\'s balance sheet gets marked down.',
     fields, presets, buildSettings, rules, steps, assign, afterStep, resolve, renderProjector, renderStudent, wireStudent, renderInstructor, sim, exportRows,
+    debrief, nonresponse: 'the bank sells nothing this step; any shortfall is then sold for it at the forced-sale discount.',
+    compare: { metric: 'the number of banks that fail', note: 'Every round uses the same balance sheets and the same withdrawals; banks may still choose differently after seeing earlier rounds. One shared asset and a fixed price rule illustrate contagion; they do not estimate real failures.' },
     openLabel: 'Open step 1', stepLabel: S => `End step ${S.step}; sell and reprice`, closeLabel: S => S.step >= steps(S.settings) ? 'End the last step' : 'End the crisis now', model: { simulate, shocks } };
   window.CLASSROOM_GAME = game;
   if (!window.CLASSROOM_NO_START) window.Classroom.start(game);

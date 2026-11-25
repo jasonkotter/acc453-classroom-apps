@@ -112,13 +112,19 @@
     const h = S.history.find(x => x.roundNo === S.roundNo); if (!h) return head;
     const r = resolvePeg(s, h.result.n, h.result.byWindow), x = h.result;
     return `${head}<div class="split"><div><div class="label">${r.brokeIn ? 'The peg broke' : 'The peg held'}</div><div class="lead">${r.brokeIn ? `Devalued ${s.devalue}%` : 'Peg held'}</div>
-      <p class="sub">${r.converted} of ${r.n} converted; ${x.nNeed} had to. ${r.brokeIn ? `Holders end with ${money(r.perHold)}.` : `Holders earn ${money(r.perHold)}.`}${r.imfUsed > 0.5 ? ` The IMF line paid $${Math.round(r.imfUsed)}.` : ''}</p>
+      <p class="sub">${r.converted} of ${r.n} converted: ${x.nNeed} importers who had to, and ${Math.max(0, r.converted - x.nNeed)} who chose to. ${r.brokeIn ? `Holders end with ${money(r.perHold)}.` : `Holders earn ${money(r.perHold)}.`}${r.imfUsed > 0.5 ? ` The IMF line paid $${Math.round(r.imfUsed)}.` : ''}</p>
       ${ui.tiles([['Each converter got', r.perWindow.map((v, i) => v == null ? null : `w${i + 1}: ${money(v)}`).filter(Boolean).join(' · ') || '—'], ['Each holder got', money(r.perHold)], ['Holders guessed', x.guessHold != null ? Math.round(x.guessHold) + '%' : '—'], ['Converters guessed', x.guessRun != null ? Math.round(x.guessRun) + '%' : '—']])}</div>
       <div>${meter(s, r.n, x.nNeed, r.converted)}${ui.table(['Window', 'Converted', 'Each got'], x.byWindow.map((c, i) => [`Window ${i + 1}`, c, r.perWindow[i] == null ? '—' : money(r.perWindow[i])]))}</div></div>${comparison(S)}`;
   }
+  /* A worked example with this round's numbers: ten holders. */
+  function example(s) {
+    const n = 10, dollars = n * (s.reservePct + s.imfPct), need = Math.round(n * s.needPct / 100), safe = Math.floor(dollars / 100), more = Math.max(0, safe - need) + 1, left = dollars - 100 * need;
+    const breaks = need + more <= n;
+    return `<details open><summary>Worked example: ten holders</summary><p class="note" style="margin:6px 0 0">Ten holders have 1,000 pesos. The central bank has $${Math.round(dollars)}${s.imfPct ? ', counting the IMF line' : ''}. ${need} importers convert $${100 * need}, leaving $${Math.round(left)}: enough for ${Math.max(0, safe - need)} more. ${breaks ? `If ${more} more ask in a later window, they want $${100 * more} and split the $${Math.round(left)} that is left, about $${Math.round(left / more)} each. The peg breaks, and each holder's 100 pesos then buy only $${100 - s.devalue}.` : 'Even if everyone converts, the dollars cover it, so the peg cannot break.'} Holding pays $${100 + s.premium} only if the peg survives.</p></details>`;
+  }
   function renderStudent(S, me) {
     const s = clean(S.settings), p = me.priv[S.roundNo] || {}, rn = S.roundNo, by = S.pub.byWindow || [];
-    if (S.phase === 'instructions') return '<h2>Get ready</h2><p class="sub">Read the rules. Conversions open in a moment.</p>';
+    if (S.phase === 'instructions') return `<h2>Get ready</h2>${ui.brief('100 pesos, which the central bank promises to swap for $100.', `first a guess at how much of the class will convert, then <b>hold</b> ($${100 + s.premium} if the peg survives) or <b>convert</b> ($100 now, while dollars last).`, `${s.needPct ? `${s.needPct}% of you are importers who must convert. ` : ''}After each window the count goes on the screen. If a window asks for more dollars than are left, the peso falls ${s.devalue}%.`)}${example(s)}`;
     const cur = me.moves[String(S.step)] || {}, first = me.moves['1'] || {}, guess = first.guess;
     if (S.phase === 'open') {
       if (S.pending) return '<h2>Counting…</h2>';
@@ -161,8 +167,32 @@
     return d.players.filter(p => d.private[p.id]).map(p => { const x = d.private[p.id], g = d.moves.find(m => m.player === p.id && m.step === 1);
       return { round: h.roundNo, label: h.label, reserve_pct: h.settings.reservePct, imf_pct: h.settings.imfPct, broke_in_window: r.brokeIn || '', display_name: p.name, importer: !!x.need, converted_in_window: x.need ? 1 : x.wdWindow || '', guess_pct: g && g.data.guess != null ? g.data.guess : '', payout: x.pay != null ? x.pay.toFixed(2) : '' }; });
   }
+  const CHECKS = {
+    run: { q: 'Dollar reserves cover 30% of the pesos. 20% of holders are importers who must convert. You do not need dollars, and you expect another 25% of holders to convert. What should you do?',
+      options: [['a', 'Convert now: 45% of pesos would be more than the 30% the reserves cover'], ['b', 'Hold for the extra interest: the central bank has promised one for one'], ['c', 'It makes no difference']], answer: 'a',
+      why: '20% + 25% = 45% of pesos would be presented, but the dollars cover only 30%. The peg breaks, converters who are early are paid in full, and holders lose the devaluation. Your best move depends on what you expect others to do, which is why a peg with thin reserves can fall to a self-fulfilling run.',
+      trap: 'judging the peg by the central bank\'s promise instead of by its reserves compared with what others will ask for.' },
+    backstop: { q: 'An IMF credit line large enough to cover nearly every peso is announced. Nobody runs, and the line is never drawn. Did it do anything?',
+      options: [['a', 'Yes: knowing it was there removed the reason to convert early'], ['b', 'No: money that is never used has no effect'], ['c', 'Only after the peg breaks']], answer: 'a',
+      why: 'A run happens when each holder expects others to convert. A backstop big enough to pay everyone means converting early gains nothing, so no one starts the run, and the line is never needed. Like deposit insurance, it works through expectations.',
+      trap: 'measuring a backstop by how much it pays out. The best-working backstop may pay nothing, though it still has costs: the IMF attaches conditions, and a country may have to raise interest rates to defend the peg.' }
+  };
+  function debrief(S, hh) {
+    const s = clean(hh.settings), r = resolvePeg(s, hh.result.n, hh.result.byWindow), x = hh.result, chose = Math.max(0, r.converted - x.nNeed), backed = s.imfPct > 0 || s.reservePct >= 80;
+    return {
+      explain: chose === 0 ? `Only the ${x.nNeed} importers converted, and the peg held. The peg would have broken beyond ${maxSafe(s, r.n)} conversions. Why did nobody else move? What would you have had to see to convert?`
+        : `${chose} holder${chose === 1 ? '' : 's'} converted without having to, on top of ${x.nNeed} importers, and the peg ${r.brokeIn ? `broke in window ${r.brokeIn}` : 'held'}. Holders who converted guessed ${x.guessRun != null ? Math.round(x.guessRun) + '%' : '—'} would convert; those who held guessed ${x.guessHold != null ? Math.round(x.guessHold) + '%' : '—'}. Use the reserves ($${Math.round(r.reserves)}${r.imf ? ` + IMF $${Math.round(r.imf)}` : ''} for ${r.n * 100} pesos) to explain why expectations decided the outcome.`,
+      transfer: backed ? 'Thailand reported $32.3 billion of reserves at the end of June 1997, but about $29 billion of it was already promised to buyers in forward contracts. Why did a peg with "large" reserves still break? What does a country give up to keep a peg: interest rates, the IMF\'s conditions, or something else?'
+        : 'How is defending a currency peg like stopping a bank run, and how is it different? Who plays the depositors, what plays the bank\'s cash, and is there anything like deposit insurance for a currency?',
+      check: backed ? CHECKS.backstop : CHECKS.run
+    };
+  }
+
   const game = { id: 'peg', title: 'Defend the Peg', tagline: 'Everyone holds pesos pegged to the dollar. Hold for the extra interest, or convert before the reserves run out.',
     fields, presets, buildSettings, steps, rules, assign, afterStep, resolve, controls, renderProjector, renderStudent: (S, me, ctx) => { lastS = S; return renderStudent(S, me, ctx); }, wireStudent, renderInstructor, sim, exportRows,
+    debrief, nonresponse: 'no guess is recorded, and the holder keeps their pesos (doing nothing counts as holding, so a hold may be a choice or a default).',
+    expected: S => S.step === 1 ? S.nPlayers : null,
+    compare: { metric: 'the number who convert without having to', note: 'A different random group are importers each round, and everyone has seen the last round. Ample reserves (90%) and thin reserves plus the IMF (35% + 50% = 85%) are not quite the same amount of protection.' },
     stepLabel: S => S.step < steps(S.settings) ? `End window ${S.step} of ${steps(S.settings)}` : 'End the last window', closeLabel: S => S.step < steps(S.settings) ? 'End the round now' : 'End the last window', openLabel: 'Open conversions', model: { resolvePeg } };
   window.CLASSROOM_GAME = game;
   if (!window.CLASSROOM_NO_START) window.Classroom.start(game);

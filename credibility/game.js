@@ -50,7 +50,7 @@
       <li>Each of ${s.years} years: first, <b>the public forecasts inflation</b>. Then the policy team ${s.mode === 'commit' ? '<b>announces next year\'s inflation, and that plan is binding</b>: this year\'s inflation is last year\'s plan (year 1: the 2% target)' : '<b>chooses this year\'s inflation</b> and may announce a plan for next year'}.</li>
       <li><b>Unemployment = ${NATURAL}% − (inflation − the class's average forecast).</b> Only a surprise moves it: inflation above what people expected pushes unemployment down.</li>
       <li><b>Public:</b> your score is how far your forecast missed. Lower is better.</li>
-      <li><b>Policy team:</b> your score is (inflation − 2)²${teamW(s) ? ` + ${teamW(s)} × (unemployment − ${WANT_U})²` : ''}. Lower is better.${teamW(s) ? ` The team wants inflation at 2% and unemployment at ${WANT_U}%, below its natural rate.` : ' You are scored on inflation only.'}</li></ul>`;
+      <li><b>Policy team:</b> your score is (inflation − 2)²${teamW(s) ? ` + ${teamW(s)} × (unemployment − ${WANT_U})²` : ''}. Lower is better.${teamW(s) ? ` The team wants inflation at 2% and unemployment at ${WANT_U}%, below its natural rate.` : ' You are scored on inflation only.'} This score is a classroom incentive that builds in the temptation; it is not any real central bank's stated objective.</li></ul>`;
   }
 
   /* ---------- the model ---------- */
@@ -130,7 +130,7 @@
     const h = S.history.find(x => x.roundNo === S.roundNo); if (!h) return head;
     const r = h.result;
     return `${head}<div class="split"><div><div class="label">${modeName(r.mode)} · average inflation</div><div class="lead">${f1(r.avgPi)}</div>
-      <p class="sub">with unemployment averaging <b>${f1(r.avgU)}</b> (natural rate ${NATURAL}%). Inflation ran ${Math.abs(r.gap).toFixed(1)} points ${r.gap >= 0 ? 'above' : 'below'} what was announced.${r.mode === 'discretion' ? ` If everyone saw the temptation coming, inflation would settle at <b>${f1(r.discEq)}</b> with no gain in jobs.` : ''}</p>${yearTable(S)}</div>
+      <p class="sub">with unemployment averaging <b>${f1(r.avgU)}</b> (natural rate ${NATURAL}%). Inflation ran ${Math.abs(r.gap).toFixed(1)} points ${r.gap >= 0 ? 'above' : 'below'} what was announced.${r.mode === 'discretion' ? ` In this model, if everyone saw the temptation coming, inflation would settle at <b>${f1(r.discEq)}</b> with no gain in jobs.` : ''}</p>${yearTable(S)}</div>
       <div>${chart(S)}</div></div>${comparison(S)}`;
   }
   /* The policy team's calculator: for each inflation choice, unemployment and the team's score. */
@@ -141,7 +141,9 @@
   }
   function renderStudent(S, me) {
     const s = clean(S.settings), p = me.priv[S.roundNo] || {}, policy = p.role === 'policy';
-    if (S.phase === 'instructions') return '<h2>Get ready</h2><p class="sub">Roles are assigned when the round opens.</p>';
+    if (S.phase === 'instructions') { const w = teamW(s), ex = 4, u = unemp(ex, TARGET);
+      return `<h2>Get ready</h2>${ui.brief('a role, shown when the round opens: most of you set wages and prices; a few are the policy team.', `the public forecasts inflation each year; the policy team ${s.mode === 'commit' ? 'announces next year\'s inflation, and the plan binds' : 'then chooses this year\'s inflation'}.`, 'unemployment moves only when inflation surprises the public. Scores add up over the years.')}
+      <details open><summary>One worked year</summary><p class="note" style="margin:6px 0 0">The public expects ${f1(TARGET)}. ${s.mode === 'commit' ? 'Suppose the plan was' : 'The team chooses'} ${f1(ex)}. Unemployment = ${NATURAL}% − (${ex} − ${TARGET}) = ${f1(u)}. The team scores (${ex} − 2)²${w ? ` + ${w} × (${u} − ${WANT_U})²` : ''} = ${loss(ex, TARGET, w).toFixed(1)}; a public forecaster who said ${TARGET}% missed by ${ex - TARGET} points. Next year, what would you forecast?</p></details>`; }
     const ys = S.pub.years || [], role = policy ? `<div class="banner"><strong>You are on the policy team</strong>${s.mode === 'conservative' ? 'You are scored on inflation only.' : 'You want 2% inflation and unemployment at 3%.'}</div>` : '<div class="banner"><strong>You set wages and prices</strong>Forecast inflation as accurately as you can.</div>';
     const score = `<p class="note">Your score so far: ${(p.score || 0).toFixed(1)} (lower is better).</p>`;
     if (S.phase === 'open') {
@@ -203,8 +205,23 @@
     return d.players.filter(p => d.private[p.id]).map(p => { const x = d.private[p.id];
       return { round: h.roundNo, label: h.label, mode: h.settings.mode, display_name: p.name, role: x.role, answers: d.moves.filter(m => m.player === p.id).map(m => `${m.step}:${m.data.exp ?? ''}${m.data.pi ?? ''}${m.data.announce != null ? '/' + m.data.announce : ''}`).join(' '), score: (x.score || 0).toFixed(2) }; });
   }
+  function debrief(S, hh) {
+    const r = hh.result, gap = (r.gap >= 0 ? '+' : '') + r.gap.toFixed(1);
+    return {
+      explain: `Average inflation was ${f1(r.avgPi)}, with unemployment averaging ${f1(r.avgU)} against a natural rate of ${NATURAL}%, and inflation ran ${gap} points from what was announced. Pick one year from the table and walk through it: forecast, choice, surprise, unemployment. Public: what made you believe or doubt the announcement?`,
+      transfer: 'From 2021 to 2023 Turkey\'s central bank cut interest rates while inflation climbed above 80%. Using this game, what would you expect to happen to inflation forecasts and wage demands? What causes besides credibility might also explain Turkey\'s inflation?',
+      check: { q: 'The public expects 2% inflation. A central bank that cares about unemployment chooses 5% this year. In this game\'s model, what happens?',
+        options: [['a', 'Unemployment falls this year; then forecasts rise and the gain disappears, leaving higher inflation'], ['b', 'Unemployment stays lower for as long as inflation stays at 5%'], ['c', 'Nothing, because the public expected 2%']], answer: 'a',
+        why: 'This year unemployment = 5% − (5 − 2) = 2%. But forecasters who were fooled raise their forecasts. Once they expect 5%, choosing 5% is no surprise, and unemployment is back at 5% with inflation higher than before. That conclusion follows from this model\'s assumptions that people learn and only surprises matter; real economies adjust more slowly and less completely.',
+        trap: 'thinking a central bank can keep buying lower unemployment with higher inflation. Here only surprises work, and surprises do not last.' }
+    };
+  }
+
   const game = { id: 'credibility', title: 'Can the Central Bank Be Believed?', eyebrow: 'Expectations and commitment', tagline: 'A few of you run the central bank. The rest of you decide whether to believe it.',
     fields, presets, buildSettings, rules, steps, assign, afterStep, resolve, renderProjector, renderStudent, wireStudent, renderInstructor, sim, exportRows,
+    debrief, nonresponse: 'a missing forecast is left out of the public\'s average (with no forecasts at all, last year\'s inflation is used); a silent policy team means 2% inflation (under commitment, the announced plan stands).',
+    expected: S => S.step % 2 ? Math.max(0, S.nPlayers - (S.pub.nTeam || 0)) : (S.pub.nTeam || null),
+    compare: { metric: 'average inflation', note: 'A new policy team is drawn each round and the public has learned from earlier rounds, so a gap mixes the regime change with who was on the team and what the class learned.' },
     openLabel: 'Open year 1 forecasts', stepLabel: S => S.step % 2 ? `Close year ${Math.ceil(S.step / 2)} forecasts` : `End year ${S.step / 2}`, closeLabel: S => S.step >= steps(S.settings) ? 'End the last year' : 'End the round now', model: { run, best, loss } };
   window.CLASSROOM_GAME = game;
   if (!window.CLASSROOM_NO_START) window.Classroom.start(game);

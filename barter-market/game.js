@@ -37,10 +37,14 @@
       'To trade, enter your partner\'s tag and the goods, and send the offer. Your partner accepts it on their phone, and the goods change hands at once.',
       'When you hold the good you want, you consume it and you are <b>done</b>. Keep helping others if you like.',
       s.money ? 'You also have <b>one token</b>. Anyone will take a token for a good: you can <b>sell</b> your good for a token, then <b>buy</b> the good you want with it.' : 'There is no money: a trade is goods for goods. You may accept a good you do not want, if you think you can trade it on.',
-      `You have ${s.minutes} minutes.`
+      `You have ${s.minutes} minutes.`,
+      'Rather not walk around? Trade from your seat: call out across the room, or pair with a neighbor who carries your offers. Tags work from anywhere.'
     ];
     return '<ul class="rules">' + out.map(x => `<li>${x}</li>`).join('') + '</ul>';
   }
+
+  const EXAMPLE = `<details open><summary>Two ways to trade</summary><p class="note" style="margin:6px 0 0"><b>Direct:</b> Ana has 🍞 and wants 🐟; Ben has 🐟 and wants 🍞. They swap and both are done.<br>
+    <b>Indirect:</b> Ana has 🍞 and wants 🐟, but Ben, who has 🐟, wants 🧂. Cy has 🧂 and wants 🍞. Ana takes Cy's 🧂 for her 🍞 (Cy is done), then gives the 🧂 to Ben for his 🐟. Two trades, and Ana had to hold salt she did not want.</p></details>`;
 
   /* ---------- assignments: every good is held as often as it is wanted ---------- */
   function assign({ S, settings, roster, rng }) {
@@ -80,7 +84,7 @@
   function renderProjector(S, ctx) {
     const s = S.settings, head = `<div class="label">Round ${S.roundNo} · ${esc(S.label)}</div>`;
     if (S.phase === 'instructions')
-      return `${head}<h2>${s.money ? 'Now with money' : 'Trade by barter'}</h2><div class="split"><div>${rules(s)}${ctx.joinLine()}</div><div>${comparison(S) || `<p class="sub">Goods in this market: ${s.goods.map(good).join(' · ')}</p>`}</div></div>`;
+      return `${head}<h2>${s.money ? 'Now with money' : 'Trade by barter'}</h2><div class="split"><div>${rules(s)}${s.money ? '' : EXAMPLE}${ctx.joinLine()}</div><div>${comparison(S) || `<p class="sub">Goods in this market: ${s.goods.map(good).join(' · ')}</p>`}</div></div>`;
     if (S.phase === 'open' || S.phase === 'closed') {
       const pts = ctx.live.history.map(x => [Math.max(0, (x.t - S.pub.openedAt) / 1000), x.nDone / Math.max(1, S.nPlayers) * 100]);
       return `${head}<div class="split"><div><h2>${S.phase === 'open' ? 'Trading is open' : 'Trading is closed'}</h2>
@@ -93,7 +97,6 @@
     const r = h.result;
     return `${head}<div class="split"><div><div class="label">${r.money ? 'With money' : 'By barter'}</div><div class="lead">${ui.pct(r.done / Math.max(1, r.n))} got what they wanted</div>
       ${ui.tiles([['Students done', `${r.done} of ${r.n}`], ['Trades made', r.trades], ['Trades per student done', r.done ? (r.trades / r.done).toFixed(1) : '—'], ['Holding a good they took to trade on', r.holding]], 'two')}
-      ${S.phase === 'debrief' ? `<div class="banner"><strong>Talk about it</strong>Why was barter slow? Did anyone take a good they did not want, to trade it on? Which good would you have taken? What did the token do?</div>` : ''}
       </div><div>${comparison(S)}</div></div>`;
   }
 
@@ -107,7 +110,7 @@
     const s = S.settings, p = me.priv[S.roundNo] || {}, mine = me.moves[String(S.step)];
     const status = `<div class="row" style="justify-content:space-between;align-items:center"><div><div class="label">Your trading tag</div><div class="tagbig">${esc(me.tag)}</div></div>${S.phase === 'open' ? `<div style="text-align:right"><div class="label">Time left</div>${ui.countdown(S.pub.endsAt)}</div>` : ''}</div>`;
     const holdings = `${ui.tiles([['You have', (p.goods || []).length ? p.goods.map(good).join(', ') : 'nothing'], ['You want', p.done ? '✔ done' : good(p.want)], ...(s.money ? [['Tokens', p.tokens || 0]] : [])], s.money ? 'three' : 'two')}`;
-    if (S.phase === 'instructions') return `<h2>Get ready to trade</h2>${status}<p class="sub">Your goods appear when trading opens.</p>`;
+    if (S.phase === 'instructions') return `<h2>Get ready to trade</h2>${status}${ui.brief('one good, and a want for a different good. Both appear when trading opens.' + (s.money ? ' You also get one token.' : ''), s.money ? 'whom to trade with: swap goods, sell your good for a token, or buy the good you want with a token.' : 'whom to trade with, and whether to accept a good you do not want so you can trade it on.', 'when you hold the good you want, you are done. The screen counts how many are done.')}${EXAMPLE}`;
     if (S.phase === 'closed' || S.phase === 'revealed' || S.phase === 'debrief') {
       const h = S.history.find(x => x.roundNo === S.roundNo);
       return `<h2>${p.done ? '✔ You got what you wanted' : 'Trading is over'}</h2>${holdings}${h ? `<p class="sub">${h.result.done} of ${h.result.n} students got what they wanted, in ${h.result.trades} trades.</p>` : '<p class="sub">Waiting for the results.</p>'}`;
@@ -175,9 +178,23 @@
     return d.players.filter(p => d.private[p.id]).map(p => { const x = d.private[p.id]; return { round: h.roundNo, label: h.label, money: !!h.settings.money, display_name: p.name, tag: p.tag, started_with: x.start, wanted: x.want, done: !!x.done, seconds_to_done: x.done ? Math.round((x.doneAt - h.pub.openedAt) / 1000) : '', trades: x.trades || 0, tokens_left: x.tokens || 0, holding: (x.goods || []).join(' ') }; });
   }
 
+  function debrief(S, hh) {
+    const r = hh.result, per = r.done ? (r.trades / r.done).toFixed(1) : '—';
+    return {
+      explain: !r.trades ? `Nobody traded this round. What made it so hard to find a partner? What would have to be true about two people for a single swap to happen${r.money ? ', and why did the token not help' : ''}?` : `${r.done} of ${r.n} got what they wanted, in ${r.trades} trades (${per} per student done)${r.money ? '' : `, and ${r.holding} ended up holding a good they took only to trade on`}. ${r.money ? 'Compare with the barter round: what did the token let you do that no good could?' : 'Reconstruct one chain of trades someone used. Where did the double coincidence of wants fail, and how did people get around it?'}`,
+      transfer: 'Cigarettes worked as money in prisoner-of-war camps, and phone airtime has worked as money in parts of Africa. What made each one acceptable? What could make people stop taking it, and what keeps people accepting dollars?',
+      check: { q: 'Ana has bread and wants fish. Ben has fish and wants salt. Cy has salt and wants bread. There is no money, and trades are between two people. What is the fewest trades that gets all three what they want?',
+        options: [['a', 'One'], ['b', 'Two'], ['c', 'Three'], ['d', 'It cannot be done without money']], answer: 'b',
+        why: 'No pair wants each other\'s good, so there is no double coincidence. Ana gives Cy bread for salt (Cy is done), then gives Ben the salt for fish (both done). It works only because Ana accepts salt she does not want and passes it on: for that moment, salt is doing the job of money.',
+        trap: 'thinking barter is impossible without a double coincidence. It is possible, but it takes search and a willingness to hold goods you do not want. Money is the good everyone will take.' }
+    };
+  }
+
   const game = { id: 'barter', title: 'Barter Market', tagline: 'You have one thing and want another. Find someone to trade with, first by barter, then with money.',
     fields, presets, buildSettings, rules, assign, resolve, renderProjector, renderStudent, wireStudent, renderInstructor, sim, exportRows,
-    showTag: true, broadcastStudentActions: true, openLabel: 'Open trading', closeLabel: () => 'Close trading' };
+    showTag: true, broadcastStudentActions: true, openLabel: 'Open trading', closeLabel: () => 'Close trading', debrief,
+    expected: () => null,
+    compare: { metric: 'the share of the class who get what they want', note: 'The money round uses a new random draw of goods and wants, and comes after a round of practice, so some of any gain may be practice or the luck of the draw.' } };
   window.CLASSROOM_GAME = game;
   if (!window.CLASSROOM_NO_START) window.Classroom.start(game);
 })();

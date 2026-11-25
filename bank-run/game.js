@@ -201,6 +201,21 @@
       return `<tr><td>${h.roundNo}. ${esc(h.label)}</td><td>${r.w + r.late} of ${r.n} (${pct((r.w + r.late) / Math.max(r.n, 1))})</td><td>${h.nNeed}</td><td>${c.ran}</td><td>${whole(c.destroyed)}</td><td>${outside > 0.005 ? whole(outside) : '—'}</td><td>${money(r.perHold)}</td><td>${{ sound: '✔ survived', short: '▲ holders lost', closed: '✖ closed' }[r.status]}</td></tr>`; }).join('')}</tbody></table></div>`;
   }
 
+  /* A worked example with this round's bank, before anyone chooses: 10 depositors, the ones
+     who need cash plus two more withdraw. Every number comes from the payout model. */
+  function workedExample(s) {
+    s = M.cleanSettings(s);
+    const n = 10, k = Math.min(9, Math.round(n * s.needPct / 100) + 2), r = M.resolveBank(s, n, k), d = s.deposit;
+    const parts = [`${money(r.cashUsed)} from cash`];
+    if (r.fedLoan > 0.005) parts.push(`${money(r.fedLoan)} borrowed from the central bank against good loans`);
+    if (r.saleProceeds > 0.005 && !r.closed) parts.push(`${money(r.saleProceeds)} from selling ${money(r.loansSold)} of loans at ${s.salePricePct}¢`);
+    const today = r.closed ? `It can raise only ${money(r.paidToday)}, so it closes: the ${k} withdrawers split that, about ${money(r.perWithdrawBank)} each, and the holders get nothing from the bank.`
+      : `It pays ${parts.length > 1 ? parts.slice(0, -1).join(', ') + ' and ' + parts[parts.length - 1] : parts[0]}.`;
+    const later = r.closed ? '' : ` Later, each of the ${n - k} holders receives <b>${money(r.perHoldBank)}</b> from the bank${r.perHoldBank < d - 0.005 ? `, less than the ${money(d)} they put in` : ''}.`;
+    const ins = s.insurance && r.perHold > r.perHoldBank + 0.005 ? ` Deposit insurance tops each holder up to ${money(r.perHold)}.` : '';
+    return `<details open><summary>Worked example: this bank with 10 depositors</summary><p class="note" style="margin:6px 0 0">The bank holds ${money(r.cash)} in cash and ${money(r.loansFace)} in loans for ${money(r.deposits)} of deposits${r.loanLoss > 0 ? `, and ${money(r.loanLoss)} of the loans will never be repaid` : ''}. Suppose ${k} of the 10 withdraw (${Math.round(n * s.needPct / 100)} who need cash and ${k - Math.round(n * s.needPct / 100)} more). They ask for ${money(r.requested)}. ${today}${later}${ins} Every extra withdrawal changes these numbers for everyone who stays.</p></details>`;
+  }
+
   /* ---------- projector ---------- */
   function renderProjector(S, ctx) {
     const V = view(S), s = M.cleanSettings(V.settings), K = s.windows, n = V.nPlayers, head = `<div class="label">Round ${V.roundNo} · ${esc(V.label)}</div>`, joinLine = ctx.joinLine();
@@ -249,7 +264,8 @@
     const V = view(S), me = V.me, rn = V.roundNo, w = me.withdrew[rn];
     const mineIn = V.history.filter(h => me.eligibleFrom <= h.roundNo && (me0.priv[h.roundNo]));
     const total = mineIn.reduce((t, h) => t + (M.payoutFor(resultOf(h), me.withdrew[h.roundNo]) || 0), 0), played = mineIn.length;
-    if (V.phase === 'instructions') return `<h2>Get ready</h2><p class="sub">Read the rules. The instructor will open withdrawals in a moment.</p>${balanceSheet(V.settings, 0)}${badges(M.cleanSettings(V.settings))}`;
+    if (V.phase === 'instructions') { const s = M.cleanSettings(V.settings);
+      return `<h2>Get ready</h2>${ui.brief(`${money(s.deposit)} in this bank.`, `first a guess at how much of the class will withdraw, then <b>hold</b> (${money(s.deposit + s.holdBonus)} later, if the bank can pay) or <b>withdraw</b> (${money(s.deposit)} today, if it can pay).${s.windows > 1 ? ` You can withdraw in any of ${s.windows} windows.` : ''}`, `${s.needPct ? `${s.needPct}% of you are told privately that you need cash. ` : ''}${s.windows > 1 ? 'After each window the count goes on the screen. ' : ''}What everyone receives depends on how many withdraw.`)}${balanceSheet(V.settings, 0)}${badges(s)}${workedExample(s)}`; }
     if (V.phase === 'open') return studentOpen(V, me, S);
     if (V.phase === 'closed') return `<h2>Withdrawals are closed</h2><div class="banner"><strong>${me.need[rn] ? 'You needed cash and withdrew' : w ? 'You withdrew in window ' + w : 'You held'}</strong>Waiting for the instructor to reveal what happened to the bank.</div>`;
     const h = V.history.find(x => x.roundNo === rn); if (!h) return '<p>Waiting for results.</p>';
@@ -271,6 +287,39 @@
     root.querySelectorAll('[data-wd]').forEach(b => b.onclick = () => ctx.submit(payload(b.dataset.wd === '1', first.guess)));
   }
   function renderStudentWrapped(S, me, ctx) { lastS = S; return renderStudent(S, me, ctx); }
+
+  /* ---------- debrief: explain, transfer, exit check ---------- */
+  const CHECKS = {
+    illiquid: { q: 'A bank holds $20 of cash and $80 of sound loans for every $100 of deposits. Its loans sell today for only 60 cents on the dollar. Ignore interest. If 40% of depositors withdraw at once, what happens to the depositors who stay?',
+      options: [['a', 'They lose money even though every loan is sound'], ['b', 'They are fine: the loans are sound, so they will be repaid in full'], ['c', 'Nothing: the withdrawers pay for the fire sale, not the holders'], ['d', 'The bank was insolvent before anyone withdrew']], answer: 'a',
+      why: 'Paying $40 takes the $20 of cash plus $33.33 of loans sold for $20. That leaves $46.67 of loans to repay $60 owed to holders: about 78 cents per dollar. With no run, $100 of assets covered $100 of deposits. The bank was illiquid, not insolvent, and the run itself created the loss.',
+      trap: 'thinking that sound loans make a bank safe from a run. Sound loans cannot be turned into cash today at full value, and the gap falls on whoever stays.' },
+    insured: { q: 'Every deposit is fully insured. You do not need cash, and you see half the class withdraw. What is your best choice?',
+      options: [['a', 'Hold: you get at least your deposit either way, and more if the bank survives'], ['b', 'Withdraw before the bank runs out'], ['c', 'It depends on how many others withdraw']], answer: 'a',
+      why: 'With full insurance, holding never pays less than withdrawing. The reason to run disappears, so the run usually never starts and the insurance is rarely paid out.',
+      trap: 'thinking insurance works by paying out a lot. It works by removing the reason to run. It costs little only when the bank is illiquid but solvent; with real losses, someone pays.' },
+    backstop: { q: 'A central bank lends only against good loans, dollar for dollar. Which bank can that loan save?',
+      options: [['a', 'A bank with sound loans that it can sell today only at a steep discount'], ['b', 'A bank whose loans are worth $75 for every $100 of deposits'], ['c', 'Both banks']], answer: 'a',
+      why: 'Lending against good loans turns them into cash without a fire sale, which cures a shortage of cash. A bank whose assets are worth less than its deposits is insolvent: a loan delays the loss or shifts it to the lender, but does not remove it.',
+      trap: 'treating every bank failure as a shortage of cash.' },
+    insolvent: { q: 'A bank has $30 of cash and $70 of loans for every $100 of deposits, but 30% of the loans will never be repaid. Nobody runs. Can it repay every depositor?',
+      options: [['a', 'No: its assets are worth about $80 for every $100 it owes'], ['b', 'Yes, as long as nobody runs'], ['c', 'Yes, if the central bank lends it cash']], answer: 'a',
+      why: '$30 of cash plus $49 of loans that will be repaid (about $50 with interest) is roughly $80 against $100 of deposits. The bank is insolvent whatever depositors do; leaving early is the sensible response to real losses, not panic.',
+      trap: 'blaming the run. A loan or deposit insurance changes who bears the $20 loss, not whether it exists.' }
+  };
+  function debrief(S, hh) {
+    const s = M.cleanSettings(hh.settings), H = { settings: s, nPlayers: hh.result.nPlayers, nNeed: hh.result.nNeed, byWindow: hh.result.byWindow }, r = resultOf(H), c = costOf(H, r), t = M.thresholds(s, r.n);
+    const solvent = c.baseSound;
+    let explain;
+    if (!solvent) explain = `This bank could not repay everyone even with no run: with only the ${H.nNeed} who needed cash leaving, each holder would have received ${money(c.base.perHold)}. Use the bad loans to explain why leaving early was a reasonable response, not panic.`;
+    else if (c.ran > 0) explain = `${c.ran} depositor${c.ran === 1 ? '' : 's'} withdrew without needing cash, and the bank paid ${whole(c.destroyed)} less than it would have with no run. Use the bank's cash (${s.cashPct} cents per $1 of deposits)${s.backstop ? ' and the central bank loan' : s.salePricePct ? ` and the ${s.salePricePct}-cent forced-sale price` : ''} to explain how each extra withdrawal made holding riskier for everyone still in the bank.`;
+    else explain = `Nobody withdrew without needing cash. On the meter, holders start to lose beyond ${t.maxSafe} withdrawals${t.maxMet < r.n ? ` and the bank closes beyond ${t.maxMet}` : ''}. ${s.insurance || s.backstop ? 'Explain what in this round took away the reason to run.' : 'What would you have had to see to leave? Why did nobody move first?'}`;
+    const transfer = !solvent ? 'Silicon Valley Bank, March 2023: most deposits were above the insurance limit, and its long-term bonds had lost value. Which rounds does it resemble? Would a central bank loan or deposit insurance have fixed the losses, or only who bears them?'
+      : s.insurance ? 'Would deposit insurance fix a bank whose assets are genuinely worth less than its deposits? Who would pay, and what might insurance do to the risks banks choose to take?'
+      : s.backstop ? 'The central bank here lends only against good loans. Could it have saved a bank whose loans are bad? What is the difference between a bank that is illiquid and one that is insolvent?'
+      : 'Today a depositor can move money with a phone app in seconds. Does that make a bank like this one more or less likely to suffer a run? What could the bank or the government do about it?';
+    return { explain, transfer, check: !solvent ? CHECKS.insolvent : s.insurance ? CHECKS.insured : s.backstop ? CHECKS.backstop : CHECKS.illiquid };
+  }
 
   function renderInstructor(S) {
     const V = view(S), h = V.history.find(x => x.roundNo === V.roundNo);
@@ -303,12 +352,17 @@
     const H = { settings: M.cleanSettings(h.settings), nPlayers: h.result.nPlayers, nNeed: h.result.nNeed, byWindow: h.result.byWindow }, r = resultOf(H), c = costOf(H, r), s = H.settings;
     return d.players.filter(p => d.private[p.id]).map(p => { const x = d.private[p.id], w = x.need ? 1 : x.wdWindow || null, g = d.moves.find(m => m.player === p.id && m.step === 1);
       return { round: h.roundNo, label: h.label, cash_pct: s.cashPct, sale_price_pct: s.salePricePct, bad_loans_pct: s.lossPct, insurance: s.insurance, insurance_limit: s.insuranceLimit, lender_of_last_resort: s.backstop, need_cash_pct: s.needPct, windows: s.windows,
-        depositors: r.n, needed_cash: H.nNeed, withdrew: r.w + r.late, ran: c.ran, bank_outcome: r.status, lost_to_run: c.destroyed.toFixed(2), display_name: p.name, needed_cash_today: !!x.need, withdrew_in_window: w ?? '', guess_pct: g && g.data.guess != null ? g.data.guess : '', payout: (M.payoutFor(r, w) ?? 0).toFixed(2) }; });
+        depositors: r.n, needed_cash: H.nNeed, withdrew: r.w + r.late, ran: c.ran, bank_outcome: r.status, lost_to_run: c.destroyed.toFixed(2), display_name: p.name, needed_cash_today: !!x.need, withdrew_in_window: w ?? '',
+        choice: x.need ? 'needed cash' : w ? 'withdrew' : d.moves.some(m => m.player === p.id) ? 'held' : 'no response (counted as holding)',
+        guess_pct: g && g.data.guess != null ? g.data.guess : '', payout: (M.payoutFor(r, w) ?? 0).toFixed(2) }; });
   }
 
   const game = { id: 'bank-run', title: 'Bank Run', tagline: 'Everyone has $100 in the same bank. Hold or withdraw. What you receive depends on what everyone else does.',
     fields, presets, buildSettings, steps, rules: rulesFor, assign, afterStep, resolve, controls, stepLabel, closeLabel,
-    renderProjector, renderStudent: renderStudentWrapped, wireStudent, renderInstructor, sim, exportRows, openLabel: 'Open withdrawals' };
+    renderProjector, renderStudent: renderStudentWrapped, wireStudent, renderInstructor, sim, exportRows, openLabel: 'Open withdrawals', debrief,
+    nonresponse: 'no guess is recorded, and the depositor keeps holding (here doing nothing counts as holding, so a hold in the results may be a choice or a default).',
+    expected: S => S.step === 1 ? S.nPlayers : null,
+    compare: { metric: 'the number who withdraw without needing cash', note: 'A different random group needs cash each round, and everyone has seen the last round, so read a gap as suggestive.' } };
   window.CLASSROOM_GAME = game;
   if (!window.CLASSROOM_NO_START) window.Classroom.start(game);
 })();

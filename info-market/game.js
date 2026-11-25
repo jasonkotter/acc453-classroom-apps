@@ -144,12 +144,16 @@
     return `${head}<div class="split"><div><div class="label">The borrower</div><div class="lead">${r.repay ? 'Repaid: $100' : 'Defaulted: $0'}</div>
       <p class="sub">${r.nClue ? `${r.nClue} of ${r.n} students had a clue; ${r.nGood} said repay, ${r.nBad} said default. ${r.nClue - r.nRight} clue${r.nClue - r.nRight === 1 ? ' was' : 's were'} wrong. Together they implied <b>$${Math.round(r.pooled * 100)}</b>.` : 'No one had a private clue.'}</p>
       ${ui.table(['', 'Price', 'Traded', 'Average probability'], [r.m1, r.m2].map((m, i) => m ? [`Market ${i + 1}${i === 1 && r.pubSig ? (r.pubSig === 'up' ? ' (after an upgrade)' : ' (after a downgrade)') : ''}`, `<b>${dollars(m)}</b>`, m.q, pct(m.belief)] : null).filter(Boolean))}
-      <p class="note">${r.traders} of ${r.n} traded at least once. Gains ranged from ${whole(r.worstGain)} to ${whole(r.bestGain)}.</p></div><div>${chart}</div></div>${comparison(S)}`;
+      <p class="note">${r.traders} of ${r.n} traded at least once. Gains ranged from ${whole(r.worstGain)} to ${whole(r.bestGain)}.${[r.m1, r.m2].some(m => m && m.price == null) ? ' Where a market shows no trade, the bid and ask are quotes, not a price anyone paid.' : ''}</p>
+      <p class="note">Three different numbers: the <b>price</b> is what traders paid; the <b>pooled clues</b> are what all the private information implied, assuming clues are independent and everyone knows how accurate they are; the <b>outcome</b> is one draw. A good probability can still be followed by a surprising outcome, so judge prices over many borrowers.</p></div><div>${chart}</div></div>${comparison(S)}`;
   }
   const clueText = c => c === 'good' ? '📈 <b>Your clue: the borrower\'s sales rose.</b> That points to repaying.' : c === 'bad' ? '📉 <b>Your clue: the borrower\'s sales fell.</b> That points to default.' : 'You have <b>no clue</b> this round.';
   function renderStudent(S, me) {
     const s = clean(S.settings), p = me.priv[S.roundNo] || {};
-    if (S.phase === 'instructions') return `<h2>Get ready</h2><p class="sub">You will start with $${CASH0} and one claim.</p>`;
+    if (S.phase === 'instructions') { const a = s.acc / 100, two = a * a / (a * a + (1 - a) * (1 - a));
+      return `<h2>Get ready</h2>${ui.brief(`$${CASH0} of cash and one claim that pays $${FACE} if the borrower repays, $0 if not.${s.share > 0 ? ' Maybe a private clue.' : ''}`, 'in each of two markets: your probability that the borrower repays, then one order to buy, sell, or sit out.', 'one clearing price for everyone; then the borrower\'s outcome decides what claims pay.')}
+      <details open><summary>Worked examples</summary><p class="note" style="margin:6px 0 0"><b>Updating:</b> you start at 50/50. A clue that is right ${s.acc}% of the time says "repay": now ${s.acc}%. A second, independent clue that also says "repay": about ${Math.round(two * 100)}%. One "repay" and one "default": back to 50%.<br>
+      <b>Orders:</b> "Buy, paying at most $60" means you buy one claim if the clearing price is $60 or less, and you pay the clearing price, not $60. "Sell, for at least $40" means you sell if the price is $40 or more. If no buy order meets a sell order, nothing trades.</p></details>`; }
     const book = ui.tiles([['Cash', '$' + p.cash], ['Claims', p.claims]], 'two');
     if (S.phase === 'open') {
       if (S.pending) return '<h2>Clearing the market…</h2>' + book;
@@ -197,8 +201,22 @@
     return d.players.filter(p => d.private[p.id]).map(p => { const x = d.private[p.id], m = st => (d.moves.find(y => y.player === p.id && y.step === st) || {}).data || {};
       return { round: h.roundNo, label: h.label, outcome: h.result.repay ? 'repaid' : 'defaulted', display_name: p.name, clue: x.clue || '', belief1: m(1).belief ?? '', order1: m(1).side ? `${m(1).side} ${m(1).price ?? ''}` : '', belief2: m(2).belief ?? '', order2: m(2).side ? `${m(2).side} ${m(2).price ?? ''}` : '', cash: x.cash, claims: x.claims, gain: x.gain ?? '' }; });
   }
+  function debrief(S, hh) {
+    const r = hh.result;
+    return {
+      explain: `The clues together implied $${Math.round(r.pooled * 100)}. Market 1: ${dollars(r.m1)}. Market 2: ${dollars(r.m2)}. The borrower ${r.repay ? 'repaid' : 'defaulted'}. Did the price end up closer to the pooled clues than the average trader's probability? Keep three numbers apart: the price, what the clues implied, and the outcome.`,
+      transfer: 'Credit spreads and credit-default-swap prices pool what many investors know about a borrower. A thinly traded bond can go days with no trades, only quotes. What can you learn from those quotes, and what can you not?',
+      check: { q: 'You start at 50/50 on whether a borrower repays. One clue that is right 65% of the time says "repay." Then a second, independent clue, also right 65% of the time, says "default." What should your probability of repayment be now?',
+        options: [['a', '50%'], ['b', '65%'], ['c', '35%'], ['d', 'About 42%']], answer: 'a',
+        why: 'Each clue tilts the odds by 65 to 35 in its direction. Two clues of equal accuracy pointing opposite ways cancel, so you are back to 50%. Two clues that both say "repay" would put you near 78%.',
+        trap: 'trusting the most recent clue, or averaging probabilities in some other way. Independent clues of equal accuracy cancel exactly.' }
+    };
+  }
+
   const game = { id: 'infomarket', title: 'Information Market', tagline: 'Each of you knows a little. Does the price end up knowing more than anyone?',
     fields, presets, buildSettings, rules, steps, assign, afterStep, resolve, renderProjector, renderStudent, wireStudent, renderInstructor, sim, exportRows,
+    debrief, nonresponse: 'no probability and no order: the student sits out this market.',
+    compare: { metric: 'how close the market 2 price comes to what the clues implied', note: 'Each round is a new borrower with new clues and a new outcome, so compare how well prices tracked the information, not whether one borrower repaid.' },
     openLabel: 'Open market 1', stepLabel: () => 'Clear market 1; announce the news', closeLabel: S => S.step >= 2 ? 'Close market 2' : 'End trading now', model: { clear, pooled, world } };
   window.CLASSROOM_GAME = game;
   if (!window.CLASSROOM_NO_START) window.Classroom.start(game);

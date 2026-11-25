@@ -143,6 +143,7 @@ window.CLASS_CHECK_SETS = [
   },
   {
     id: 'guess-release', title: 'Guess the Release', revote: false,
+    keyNote: 'Compare the class with a benchmark, such as last month\'s value or the forecasters\' consensus, not only with the actual. First releases get revised: payrolls twice and then benchmarked each year, GDP in later estimates. One release is one noisy reading.',
     note: 'Jan 21, after 03.3–03.4. Name the report and month aloud and give last month\'s value; type the actual at each reveal. Check the BLS and BEA calendars for what is out by Jan 21.',
     questions: [
       { type: 'number', prompt: 'Payroll employment: the change in the most recent jobs report, in <b>thousands of jobs</b>.', unit: 'thousands', min: -2000, max: 2000, step: 1, answer: null, explain: 'Payroll changes are noisy and revised for two months, then benchmarked. One month is weak evidence.' },
@@ -160,9 +161,9 @@ window.CLASS_CHECK_SETS = [
       ['Congress <b>cuts taxes</b> and leaves spending unchanged. What happens in the <b>Treasury</b> market?', 'c',
         'Net government financing: a bigger deficit has to be borrowed, so the Treasury sells more bonds. Supply shifts right, the price falls, and the yield rises.'],
       ['New data convince markets that <b>inflation will run higher</b> for the next decade. What happens in the <b>Treasury</b> market?', 'e',
-        'Expected inflation moves both curves: lenders want fewer fixed-dollar bonds (demand left) and borrowers want to borrow now (supply right). Both push the price down, so the yield rises.'],
+        'Expected inflation is the force in this set that works on both sides: lenders want fewer fixed-dollar bonds (demand left) and borrowers want to borrow now, while repayment dollars are cheaper (supply right). Both push the price down, so the yield rises.'],
       ['Companies see <b>more good projects</b> to fund as the economy strengthens. What happens in the <b>corporate</b> bond market?', 'c',
-        'Economic conditions shift supply, not demand: firms borrow when they have projects worth funding. Supply shifts right, the price falls, and the yield rises.'],
+        'This scenario isolates the borrower side: firms borrow when they have projects worth funding, so supply shifts right, the price falls, and the yield rises. A real expansion also raises wealth, which adds some lender demand; the usual assumption is that the supply effect is larger.'],
       ['Bond trading gets <b>cheaper and faster</b>: bid-ask spreads narrow sharply. What happens in the <b>corporate</b> bond market?', 'a',
         'Market liquidity: bonds that are easier to sell at a fair price are worth more to lenders. Demand shifts right, the price rises, and the yield falls.'],
       ['An <b>AI boom</b> raises expected stock returns well above normal. What happens in the <b>Treasury</b> market?', 'b',
@@ -172,7 +173,7 @@ window.CLASS_CHECK_SETS = [
       { id: 'b', text: 'Demand shifts left; interest rates rise', why: 'Ask whether lenders really want fewer bonds at every price here, or whether the force works on borrowers.' },
       { id: 'c', text: 'Supply shifts right; interest rates rise', why: 'Supply is borrowers. More borrowing lowers the price, and a lower price means a higher yield.' },
       { id: 'd', text: 'Supply shifts left; interest rates fall', why: 'That would need borrowers to want less. Check whether this force works on borrowers at all, and in which direction.' },
-      { id: 'e', text: 'Both curves shift; interest rates rise', why: 'Only expected inflation moves both curves. Every other force works on one side of the market.' }
+      { id: 'e', text: 'Both curves shift; interest rates rise', why: 'In this set, only the expected-inflation scenario is built to move both curves; each of the others isolates one force on one side. Real shocks often hit both sides at once.' }
     ] }))
   }
   ,{
@@ -182,9 +183,9 @@ window.CLASS_CHECK_SETS = [
       ['A household with a <b>30-year fixed-rate mortgage</b>.', 'a', 'The payments are fixed in dollars, so higher-than-expected inflation shrinks the real value of the debt. Borrowers with fixed-rate debt gain.'],
       ['A retiree whose savings sit in a <b>bank CD at a fixed rate</b>.', 'b', 'The CD pays fixed dollars that now buy less. Holders of fixed-dollar assets lose: inflation transfers from them to fixed-dollar borrowers.'],
       ['A retiree living on <b>Social Security</b>, which is raised each year with the CPI.', 'c', 'The cost-of-living adjustment keeps benefits roughly in step with prices, with a lag of up to a year, so the retiree is largely protected.'],
-      ['The <b>federal government</b>, which owes trillions of dollars of fixed-rate debt.', 'a', 'Like any fixed-rate borrower, it repays in dollars worth less. This is part of the inflation tax (Ch. 2).'],
+      ['The <b>federal government</b>, which owes trillions of dollars of fixed-rate debt.', 'a', 'Like any fixed-rate borrower, it repays in dollars worth less, so the real value of its existing nominal debt shrinks. That is related to, but not the same as, the inflation tax of Ch. 2, which is the narrower loss on the money people hold (currency and reserves).'],
       ['A <b>bank</b> holding fixed-rate mortgages, funded by deposits whose rates rise with market rates.', 'b', 'Its assets pay fixed dollars while its funding costs rise, and the mortgages lose market value as rates go up. This is the interest rate risk of Ch. 9 and SVB.'],
-      ['An investor holding <b>TIPS</b>, Treasury bonds whose principal rises with the CPI.', 'c', 'TIPS are indexed to inflation, so their real value is protected. That is what the inflation adjustment buys.'],
+      ['An investor holding <b>TIPS</b>, Treasury bonds whose principal rises with the CPI.', 'c', 'TIPS principal rises with the CPI (with a lag of a few months), so an investor who holds to maturity earns the real yield locked in at purchase. That is roughly protected, not perfectly: sold early, the price still moves with real interest rates, and the CPI may not match this investor\'s own spending.'],
       ['A worker whose <b>wage is fixed</b> for the next two years.', 'b', 'The wage is a fixed-dollar income, so its purchasing power falls until it can be renegotiated.']
     ].map(([who, answer, explain]) => ({ prompt: `Over the next two years, inflation turns out <b>5 points higher</b> than everyone expected. ${who} Does inflation make them better or worse off in real terms?`, answer, explain, options: [
       { id: 'a', text: 'Better off', why: 'Gains go to those who owe fixed dollars: their real debt shrinks.' },
