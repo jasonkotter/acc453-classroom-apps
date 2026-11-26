@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#102a35">
+  <meta name="description" content="Pick a repair for a bank that fails its capital floors, then see what survives a loan loss.">
+  <title>Repair the Capital Ratio · ACC 453</title>
+  <link rel="stylesheet" href="../_shared/classroom.css?v=20261125a">
+  <style>
+    .cr-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:10px}
+    .cr-card{border:1px solid var(--line);border-radius:12px;padding:8px 10px;background:#fff;font-size:.86em;min-width:0}
+    .cr-start{max-width:420px}
+    .cr-head{font-weight:700;line-height:1.25;margin-bottom:6px;min-height:2.5em}
+    .cr-start .cr-head{min-height:0}
+    .cr-head b{display:inline-block;background:var(--ink);color:#fff;border-radius:6px;padding:0 7px;margin-right:4px}
+    .cr-led{border-top:2px solid var(--ink);margin:4px 0}
+    .cr-row{display:grid;grid-template-columns:1fr 1fr}
+    .cr-row>div{display:flex;justify-content:space-between;gap:4px;padding:1px 5px;min-width:0}
+    .cr-row>div+div{border-left:2px solid var(--ink)}
+    .cr-row b{font-variant-numeric:tabular-nums}.cr-row span,.cr-row b{white-space:nowrap}.cr-led{font-size:.95em}
+    .cr-tot{border-top:1px solid var(--line);font-weight:700}
+    .cr-line{margin:4px 0;font-size:.95em}
+    .cr-foot{margin:6px 0 0;font-size:.92em;color:var(--muted);border-top:1px solid var(--line);padding-top:4px}
+    .cr-bar{margin:5px 0}
+    .cr-lab{display:flex;justify-content:space-between;gap:6px;font-size:.92em}
+    .cr-ok{color:#0f6e62}.cr-no{color:#b5421a}
+    .cr-track{position:relative;height:12px;background:#eef2f1;border-radius:6px;margin-top:2px}
+    .cr-fill{height:100%;border-radius:6px}.cr-fill.ok{background:var(--teal)}.cr-fill.no{background:#eb6834}
+    .cr-floor{position:absolute;top:-3px;bottom:-3px;width:3px;background:var(--ink)}
+    .cr-menu{margin:6px 0 10px;padding-left:0;list-style:none}.cr-menu li{margin:6px 0}body.proj .cr-menu{font-size:1.2em}body.proj .cr-start{max-width:none;font-size:1.1em}
+    .cr-chips{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:8px 0}
+    body.proj .cr-card{font-size:1.04em;padding:10px 12px}body.proj .cr-track{height:16px}body.proj .cr-bar{margin:8px 0}body.proj .cr-led{margin:8px 0}
+    @media (max-width:760px){.cr-grid{grid-template-columns:1fr 1fr}}
+  </style>
+</head>
+<body>
+  <p style="padding:20px">Loading…</p>
+  <script src="../_shared/config.js?v=20261125a"></script>
+  <script src="../_shared/local.js?v=20261125a"></script>
+  <script src="../_shared/classroom.js?v=20261125a"></script>
+  <script src="game.js?v=20261126h"></script>
+</body>
+</html>

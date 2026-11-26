@@ -9,19 +9,21 @@ comes from the whole class's lending.
 
 - Every student is a bank: $100 of one-year loans, $90 of deposits at 2%, and $10 of equity.
 - Each year (4 by default) a bank chooses the **share of its loans made to risky borrowers**
-  (10% interest) instead of safe ones (5%, 1% default), and sets its **allowance**: the share of
-  its loans it expects to charge off that year. A default loses 60% of the loan.
+  (10% interest) instead of safe ones (5%, 1% default), and makes a **loss forecast**: the share
+  of its loans it expects to charge off that year. The forecast is scored against actual
+  charge-offs; it is not booked as an allowance and does not change equity. A default loses 60% of the loan.
 - The published rule for the risky default rate:
   `5% + 4 × (last year's class risky share − 30%)/10 − 1 × (this year's class risky share − 30%)/10`,
   never below 1%. Easy credit this year lets weak borrowers refinance, so fewer default now;
   last year's easy credit shows up as defaults this year.
 - After the last year every surviving bank's loans roll over once more, unchanged, so the last
   year's lending is tested too. A bank whose equity falls below zero fails and stops lending.
-- No answer = last year's choices (year 1: 30% risky, 3% allowance).
-- Each year's result on the phone shows the bank's four Ch. 7 ratios: delinquency (non-current
-  ÷ loans), net charge-offs ÷ loans, loan loss reserve (allowance ÷ loans), and NPL coverage
-  (allowance ÷ non-current). Defaulted loans count as non-current at year end and are charged
-  off net of the 40% recovery.
+- No answer = last year's choices (year 1: 30% risky, 3% loss forecast).
+- Each year's result on the phone shows delinquency (non-current ÷ loans), net charge-offs ÷
+  loans, the bank's loss forecast, and the forecast miss. Defaulted loans count as non-current
+  at year end and are charged off net of the 40% recovery. The reserve ratio and NPL coverage
+  are left out: they divide by a booked allowance, and this game books none. Loss Ledger (Feb 11)
+  practices the allowance accounting.
 
 **Why it is a dilemma.** With the class at 30% risky, a risky loan earns 7% after losses against
 4.4% for a safe one, so each bank alone does better by lending more. If every bank lends 100%
@@ -47,16 +49,17 @@ bank failed; a room that chases yield harder than the simulated banks will produ
 
 Show round → Open year 1 → End year 1 … → End the last year → Reveal. The projector shows the
 class risky share and the risky default rate by year, and a table of the class's average
-allowance against its average net charge-offs.
+loss forecast against its average net charge-offs.
 
 **Debrief.** Why were losses lowest in the year lending was loosest? What did the low charge-off
 ratio in a boom year tell you about the loans being made (Section 9: "low losses late in an
 expansion prove less")? Whose behavior drove your bank's losses: yours or the class's? Did the
-class's allowances anticipate the bust, and what would CECL require? Who gains and who loses
+class's loss forecasts anticipate the bust? A real bank books its forecast as an allowance; what
+would CECL require it to cover? Who gains and who loses
 from the cap?
 
 **Model caveat.** The rule is a disclosed teaching rule, not an estimate. The evidence that
 credit booms are followed by higher losses is real; the coefficients are not.
 
-**Fallback.** Students write a risky share and an allowance on slips each year; a spreadsheet
+**Fallback.** Students write a risky share and a loss forecast on slips each year; a spreadsheet
 applies the rule.

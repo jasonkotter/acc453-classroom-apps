@@ -10,16 +10,17 @@ Students have just computed the four credit-risk ratios for one bank. The game m
 student a bank and lets the class's lending decide how many loans go bad. Easy credit makes this
 year look great, because weak borrowers can refinance, and shows up as losses next year. Students
 should leave able to explain why low charge-offs late in a boom prove little, why a bank's
-losses depend on what every other bank is doing, and why an allowance is a forecast of more than
-the bank's own loans.
+losses depend on what every other bank is doing, and why a loss forecast (the number a bank books as
+its allowance) depends on more than the bank's own loans.
 
 ## How a round works
 
 1. **Every student is a bank** with $100 of one-year loans, $90 of deposits at 2%, and $10 of
    equity.
 2. **Each year** (four), a bank chooses the share of its loans made to risky borrowers, who pay
-   10%, instead of safe ones, who pay 5% and default 1% of the time. It also sets its
-   **allowance**: the share of its loans it expects to charge off this year. A default loses 60%
+   10%, instead of safe ones, who pay 5% and default 1% of the time. It also makes a
+   **loss forecast**: the share of its loans it expects to charge off this year. The forecast is
+   scored against actual charge-offs; it is not booked as an allowance and does not change equity. A default loses 60%
    of the loan.
 3. **The published rule:** the risky default rate is 5%, plus 4 points for every 10 points that
    last year's class-average risky share was above 30%, minus 1 point for every 10 points that
@@ -33,7 +34,7 @@ first year is the best of the game and every bank fails in year 4. The share tha
 class with the most equity, if every bank chose it every year, is 20%. The reveal reports that
 benchmark next to the class's result.
 
-No answer repeats the bank's choices from last year (in year 1, 30% risky and a 3% allowance).
+No answer repeats the bank's choices from last year (in year 1, 30% risky and a 3% loss forecast).
 
 ## Rounds and timing
 
@@ -59,8 +60,8 @@ year by year.
 "Each of you runs a bank with $100 of loans. Every year you decide how much to lend to risky
 borrowers, who pay twice the interest. How many of them default depends on all of you: when the
 class lends freely, weak borrowers can refinance and defaults fall this year, but last year's
-easy lending comes back as defaults this year. You'll also set your allowance: how much you
-expect to lose."
+easy lending comes back as defaults this year. You'll also forecast your losses: how much
+you expect to charge off."
 
 ## What to expect
 
@@ -76,8 +77,9 @@ better debrief.
 **On screen.** **Begin debrief** puts three things on the projector and on every phone: an *explain* prompt that quotes this round's numbers, a *transfer* question, and a private exit check (one question on the phone; the reasoning and a common mistake appear after the student answers). Give pairs about two minutes for the first two, then a minute for the exit check. Exit-check answers are not recorded, graded, or timed. When you show the next round, the projector also lists what changed from the last round and what stayed fixed, and asks for a prediction before anyone plays. The questions below go deeper.
 
 - Why were losses lowest in the year lending was loosest?
-- Look at the table of allowances against charge-offs. Did the class's allowances anticipate the
-  bust? What would CECL require?
+- Look at the table of loss forecasts against charge-offs. Did the class's forecasts anticipate
+  the bust? A real bank books its forecast as an allowance through a provision; what would CECL
+  require it to cover?
 - Whose behavior drove your bank's losses, yours or the class's? How would you tell from the four
   ratios alone?
 - Who gains and who loses from the cap?
@@ -88,5 +90,5 @@ followed by higher losses is real; the coefficients are not.
 
 ## Fallback without the app
 
-Students write a risky share and an allowance on a slip each year; a spreadsheet on the projector
+Students write a risky share and a loss forecast on a slip each year; a spreadsheet on the projector
 applies the rule and shows the class average and the default rate.

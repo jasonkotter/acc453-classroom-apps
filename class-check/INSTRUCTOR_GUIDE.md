@@ -1,7 +1,8 @@
 # Instructor guide: Class Check
 
-**Classes:** six days, one set each (table below). **Time:** about 2 minutes a question with
-the revote, 1 minute without; a six-question set takes 10–15 minutes.
+**Classes:** thirteen days (table below); Feb 2, Mar 11, Mar 16, and Apr 13 can run two sets. **Time:**
+about 2 minutes a question with the revote, 1 minute without; a six-question set takes 10–15
+minutes.
 
 ## Goal
 
@@ -14,12 +15,22 @@ graded, and each phone shows only that student's own score.
 | Set | Class | Questions | Revote |
 |---|---|---|---|
 | Guess the Release | Jan 21 | 4 numbers; you type each actual value at the reveal | no |
+| Retrieval: Ch. 1–4 | Jan 28 | 2 mixed: velocity from money, prices, and real growth; who pays for card rewards | yes |
+| Retrieval transfer: Ch. 1–4 | Feb 2 | 1 new question on the Jan 28 set | no |
 | Find the Accounting Error: loans and payments | Feb 2 | 5 T-account questions | yes |
+| Loss Ledger: provisions, charge-offs, and the allowance | Feb 11 | 5: provision, charge-off, recovery, the reserve ratio, what evidence next | yes |
+| Retrieval: Ch. 5–7 | Feb 18 | 2 mixed: a bank loan versus a nonbank loan; adverse selection or moral hazard | yes |
+| Retrieval transfer: Ch. 5–7 | Feb 23 | 1 new question on the Feb 18 set | no |
 | Which Curve Shifts? | Feb 25 | 6 one-force scenarios in the Ch. 8 bond-market model | yes |
+| Retrieval: Ch. 8–9 | Mar 11 | 2 mixed: a held-to-maturity bond after rates rise; what deposit insurance costs | yes |
+| Capital layers (optional) | Mar 11 | 1: which layer absorbs a loss, and which ratio still passes | yes |
+| Retrieval transfer: Ch. 8–9 | Mar 16 | 1 new question on the Mar 11 set | no |
 | Recession Call | Mar 16 | 6 mystery dates, 1995–2023; probability of a recession within 12 months | no |
 | Find the Accounting Error: the Fed buys bonds | Mar 18 | 4 open-market and discount-window questions | yes |
 | Be the FOMC | Mar 25 | 6 real meetings, June 2021–July 2023; set the top of the target range | no |
+| Shock Hearing: same inflation, different shock | Mar 30 | 5 on two made-up economies, then a paper vote | yes |
 | Who Wins From Inflation? | Apr 13 | 7 holders under 5 points of unexpected inflation | yes |
+| Retrieval: course synthesis (optional) | Apr 13 | 2: the real rate; a peg under attack | yes |
 
 ## How a question runs
 
@@ -60,6 +71,45 @@ line; the reveal strikes it through and shows the corrected entries. Two mistake
 are recording a loan without the deposit it creates and treating a Fed purchase as a change in
 M1 rather than in the base. Pause on any question where the revote does not move the room toward the
 right answer.
+
+**Loss Ledger (Feb 11).** About 8 minutes with revotes, before the NYCB case, in place of a
+repeated hand-ratio example. Bank A is made up, not NYCB. The first three questions follow one
+bank through a provision, a charge-off, and a recovery; the fourth asks what a fall in the
+reserve ratio means; the fifth asks which fact would tell safe loans from an optimistic
+estimate. The mistakes to watch for are treating the provision as cash set aside (question 1)
+and taking the charge-off out of equity a second time (question 2). The fifth question
+previews the case's first vote; to keep that vote fresh, run it after the case's first reveal
+or skip it. If time is short, reveal questions 3 and 4 without the revote.
+
+**Retrieval (Jan 28, Feb 18, Mar 11; optional Apr 13).** Each set asks two fresh questions that
+mix chapters, about 5 minutes with the revote, in the class before an exam window opens (Group
+Exam 1, the midterm, and Group Exam 2). Take the minutes from another activity, not from the
+project introduction or a core case: part of the crypto data discussion on Jan 28, part of Loan
+Officer on Feb 18 (keep BankFind, UBPR peers, and the project introduction), and one
+capital-ratio problem on Mar 11. After the first vote, have students write down how sure they
+were (sure, think so, or guessing); the app does not collect it. At the reveal, ask who was sure
+and wrong, since that is the mistake most worth fixing before the exam. Each set has a
+one-question transfer set for the start of the next class (Feb 2, Feb 23, Mar 16): a new
+question on the same idea, run without a revote as the day's first round. It is better evidence
+than the revote that the idea stuck, because the revote also measures a neighbor's argument.
+The synthesis set has no transfer; run it on Apr 13 only if Who Wins From Inflation and the
+capstone leave time.
+
+**Capital layers (Mar 11, optional).** One question, right after the Repair the Capital Ratio
+app: CET1 4, AT1 2, and Tier 2 2 against RWA of 80, then a loss of 1.5. CET1 and Tier 1 fail;
+total capital still passes, because Tier 2 counts but absorbed nothing. Skip it if the AT1
+case runs that day.
+
+**Shock Hearing (Mar 30).** Run it before the case data ("Transitory" or Volcker), in place
+of ranking the channels; about 10 minutes, or run questions 1, 4, and 5 if time is short. Two
+made-up economies have the same 5% inflation: D has excess demand (unemployment falling, wages
+up 6%, services inflation 4.8%), and S has a temporary energy shock (unemployment rising,
+services inflation 2.3%). The questions score the mechanism, what a rate increase does in S,
+which evidence shows whether the shock is spreading, the real rate on expected rather than
+past inflation, and what changes when S's shock spreads. Then take a paper vote that is not
+scored: hike, hold, or cut in S, with a reason, a horizon, and the fact that would change the
+student's mind. A defensible policy judgment is not a wrong answer, which is why the vote stays
+off the app. The case then asks the same questions of September 2021 or 1979 with real data.
 
 **Which Curve Shifts? (Feb 25).** One force per scenario. Students who get the curve right but
 the direction of the price wrong are the ones to call on, because they are close.

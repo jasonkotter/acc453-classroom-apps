@@ -30,8 +30,8 @@
   const APPS = [
     ['inflation-auction', 'auction', 'Inflation Auction'], ['barter-market', 'barter', 'Barter Market'], ['class-check', 'class-check', 'Class Check'],
     ['payment-gridlock', 'gridlock', 'Payment Gridlock'], ['multiplier-game', 'multiplier', 'Money Multiplier'], ['lemons-market', 'lemons', 'Lemons Market'],
-    ['hidden-effort', 'hidden-effort', 'Hidden Effort'], ['loan-officer', 'loanofficer', 'Loan Officer'], ['bond-showdown', 'bonds', 'Bond Showdown'],
-    ['fire-sale', 'firesale', 'Fire Sale'], ['bank-run', 'bank-run', 'Bank Run'], ['info-market', 'infomarket', 'Information Market'],
+    ['hidden-effort', 'hidden-effort', 'Hidden Effort'], ['loan-officer', 'loanofficer', 'Loan Officer'], ['bond-desk', 'bond-desk', 'Bond Desk'], ['bond-showdown', 'bonds', 'Bond Showdown'],
+    ['fire-sale', 'firesale', 'Fire Sale'], ['bank-run', 'bank-run', 'Bank Run'], ['who-bears-loss', 'who-bears-loss', 'Who Bears the Loss?'], ['rescue-fund', 'rescue-fund', 'The Rescue Fund'], ['capital-repair', 'capital-repair', 'Repair the Capital Ratio'], ['info-market', 'infomarket', 'Information Market'],
     ['fed-funds-market', 'fed-funds', 'Fed Funds Market'], ['defend-the-peg', 'peg', 'Defend the Peg'], ['credibility', 'credibility', 'Can the Central Bank Be Believed?']];
   const $ = id => document.getElementById(id), esc = window.Classroom.ui.esc, params = new URLSearchParams(location.search);
   const want = (params.get('apps') || '').split(',').filter(Boolean);

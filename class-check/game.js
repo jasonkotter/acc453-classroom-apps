@@ -89,7 +89,7 @@
     if (!show) return '';
     const wrong = key && q.type === 'choice' ? key.answer : null;
     const line = l => `<p style="${l.opt && l.opt === wrong ? 'background:var(--rose);border-radius:6px;padding:0 4px;text-decoration:line-through' : ''}"><span>${l.opt ? `<b>(${l.opt.toUpperCase()})</b> ` : ''}${esc(l.label)}</span><span>${esc(l.amount)}</span></p>`;
-    return `<div class="tgrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px">${show.map(t => `<div><div class="label" style="margin-top:6px">${esc(t.who)}</div><div class="taccount"><div><h4>Assets</h4>${(t.assets || []).map(line).join('') || '<p class="note">—</p>'}</div><div><h4>Liabilities</h4>${(t.liabilities || []).map(line).join('') || '<p class="note">—</p>'}</div></div></div>`).join('')}</div>`;
+    return `<div class="tgrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px">${show.map(t => `<div><div class="label" style="margin-top:6px">${esc(t.who)}</div><div class="taccount"><div><h4>Assets</h4>${(t.assets || []).map(line).join('') || '<p class="note">—</p>'}</div><div><h4>${esc(t.right || 'Liabilities')}</h4>${(t.liabilities || []).map(line).join('') || '<p class="note">—</p>'}</div></div></div>`).join('')}</div>`;
   }
   function figure(Q) {
     const f = Q.lines; if (!f) return '';
